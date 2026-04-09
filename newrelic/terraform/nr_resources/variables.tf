@@ -57,7 +57,7 @@ variable "metric_alert_map" {
             service_title_name = "Ad Service"
             throughput_lower_threshold = 100
             throughput_upper_threshold = 400
-            latency_threshold = 10
+            latency_threshold = 150
             error_rate_threshold = 0.01
         }
         key2 = {
@@ -65,7 +65,7 @@ variable "metric_alert_map" {
             service_title_name = "Cart Service"
             throughput_lower_threshold = 300
             throughput_upper_threshold = 600
-            latency_threshold = 10
+            latency_threshold = 150
             error_rate_threshold = 0.01
         }
         key3 = {
@@ -81,7 +81,7 @@ variable "metric_alert_map" {
             service_title_name = "Frontend Service"
             throughput_lower_threshold = 1000
             throughput_upper_threshold = 4000
-            latency_threshold = 50
+            latency_threshold = 150
             error_rate_threshold = 0.1
         }
         key5 = {
@@ -89,7 +89,7 @@ variable "metric_alert_map" {
             service_title_name = "Product Catalog Service"
             throughput_lower_threshold = 150
             throughput_upper_threshold = 600
-            latency_threshold = 50
+            latency_threshold = 150
             error_rate_threshold = 0.1
         }
         key6 = {
