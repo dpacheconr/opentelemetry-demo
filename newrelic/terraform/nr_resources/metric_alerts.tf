@@ -21,7 +21,7 @@ resource "newrelic_nrql_alert_condition" "service_error_rate" {
   violation_time_limit_seconds = 259200
 
   nrql {
-    query = "SELECT (sum(apm.service.error.count['count']) / count(apm.service.transaction.duration)) * 100 FROM Metric WHERE service.name = '${each.value.service_name}' AND (transactionType = 'Web') FACET service.name, entity.guid"
+    query = "SELECT percentage(count(*), WHERE otel.status_code = 'ERROR') FROM Span WHERE service.name = '${each.value.service_name}' AND span.kind = 'server' FACET service.name, entity.guid"
     data_account_id = var.newrelic_account_id
   }
 
@@ -31,7 +31,7 @@ resource "newrelic_nrql_alert_condition" "service_error_rate" {
     threshold_duration = local.threshold_duration
     threshold_occurrences = "at_least_once"
   }
-  fill_option = "none"
+  fill_option = "last_value"
   aggregation_window = local.aggregation_window
   aggregation_method = "event_flow"
   aggregation_delay = local.aggregation_delay
@@ -49,7 +49,7 @@ resource "newrelic_nrql_alert_condition" "service_latency" {
   violation_time_limit_seconds = 259200
 
   nrql {
-    query = "SELECT percentile(convert(apm.service.transaction.duration, unit, 'ms'), 95) FROM Metric WHERE service.name = '${each.value.service_name}' AND (transactionType = 'Web') FACET service.name, entity.guid"
+    query = "SELECT percentile(duration.ms, 95) FROM Span WHERE service.name = '${each.value.service_name}' AND span.kind = 'server' FACET service.name, entity.guid"
     data_account_id = var.newrelic_account_id
   }
 
@@ -77,7 +77,7 @@ resource "newrelic_nrql_alert_condition" "service_low_throughput" {
   violation_time_limit_seconds = 259200
 
   nrql {
-    query = "SELECT sum(apm.service.transaction.duration['count']) FROM Metric WHERE service.name = '${each.value.service_name}' AND (transactionType = 'Web') FACET service.name, entity.guid"
+    query = "SELECT count(*) FROM Span WHERE service.name = '${each.value.service_name}' AND span.kind = 'server' FACET service.name, entity.guid"
     data_account_id = var.newrelic_account_id
   }
 
@@ -105,7 +105,7 @@ resource "newrelic_nrql_alert_condition" "service_high_throughput" {
   violation_time_limit_seconds = 259200
 
   nrql {
-    query = "SELECT sum(apm.service.transaction.duration['count']) FROM Metric WHERE service.name = '${each.value.service_name}' AND (transactionType = 'Web') FACET service.name, entity.guid"
+    query = "SELECT count(*) FROM Span WHERE service.name = '${each.value.service_name}' AND span.kind = 'server' FACET service.name, entity.guid"
     data_account_id = var.newrelic_account_id
   }
 
@@ -132,7 +132,7 @@ resource "newrelic_entity_tags" "tag_metric_service_error_rate" {
 
   tag {
     key    = "data-type"
-    values = ["metric"]
+    values = ["span"]
   }
   tag {
     key    = "golden-signal"
@@ -146,7 +146,7 @@ resource "newrelic_entity_tags" "tag_metric_service_latency" {
 
   tag {
     key    = "data-type"
-    values = ["metric"]
+    values = ["span"]
   }
     tag {
     key    = "golden-signal"
@@ -160,7 +160,7 @@ resource "newrelic_entity_tags" "tag_metric_service_low_throughput" {
 
   tag {
     key    = "data-type"
-    values = ["metric"]
+    values = ["span"]
   }
   tag {
     key    = "golden-signal"
@@ -175,7 +175,7 @@ resource "newrelic_entity_tags" "tag_metric_service_high_throughput" {
 
   tag {
     key    = "data-type"
-    values = ["metric"]
+    values = ["span"]
   }
   tag {
     key    = "golden-signal"
