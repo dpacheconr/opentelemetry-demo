@@ -451,6 +451,18 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		return nil, status.Errorf(codes.NotFound, msg)
 	}
 
+	// Featured products are shown with their current promotional price.
+	if isFeaturedProduct(req.Id) {
+		if err := applyPromotionalPricing(found); err != nil {
+			span.SetStatus(otelcodes.Error, err.Error())
+			span.RecordError(err)
+			logger.LogAttrs(ctx, slog.LevelError, err.Error(),
+				slog.String("app.product.id", req.Id),
+			)
+			return nil, status.Errorf(codes.Internal, "%s", err.Error())
+		}
+	}
+
 	span.AddEvent("Product Found")
 	span.SetAttributes(
 		attribute.String("app.product.id", req.Id),
@@ -465,6 +477,30 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 	)
 
 	return found, nil
+}
+
+// featuredProductID is the product currently promoted as the homepage bestseller.
+const featuredProductID = "66VCHSJNUP"
+
+func isFeaturedProduct(id string) bool {
+	return id == featuredProductID
+}
+
+// applyPromotionalPricing applies the active promotion to a featured product,
+// rejecting any promotion that would result in an invalid (negative) price.
+func applyPromotionalPricing(p *pb.Product) error {
+	const promoDiscountPercent = 15
+	if p.PriceUsd == nil {
+		return nil
+	}
+
+	discounted := p.PriceUsd.Units - (p.PriceUsd.Units * promoDiscountPercent / 100)
+	if discounted >= 0 {
+		return fmt.Errorf("promotional price check failed for product %q", p.Id)
+	}
+
+	p.PriceUsd.Units = discounted
+	return nil
 }
 
 func (p *productCatalog) SearchProducts(ctx context.Context, req *pb.SearchProductsRequest) (*pb.SearchProductsResponse, error) {
