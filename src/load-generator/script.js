@@ -286,9 +286,14 @@ async function addProductToCartBrowser(page) {
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('a[href="/product/2ZYFJ3GM2N"]', { timeout: 15000 })
     await page.click('a[href="/product/2ZYFJ3GM2N"]')
-    await page.waitForLoadState('domcontentloaded')
+    // The product-link click is a client-side (SPA/pushState) route change, not
+    // a full navigation - domcontentloaded already fired once for the initial
+    // page load and never fires again for this transition. waitForLoadState
+    // here is a no-op that resolves instantly, before React has rendered the
+    // new route, so the add-to-cart click below never finds its target. Wait
+    // for the actual element instead - correct for both SPA and full navigation.
+    await page.waitForSelector('[data-cy="product-add-to-cart"]', { timeout: 25000 })
     await page.click('[data-cy="product-add-to-cart"]')
-    await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
 }
 
