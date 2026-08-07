@@ -279,11 +279,47 @@ async function changeCurrency(page) {
 }
 
 async function addProductToCartBrowser(page) {
+    page.on('console', msg => console.log(`PAGE-CONSOLE[${msg.type()}]: ${msg.text()}`))
     // Roof Binoculars (2ZYFJ3GM2N). Selects by href / data-cy rather than
     // :has-text(), which k6 browser's native CSS engine does not support
     // (it forwards selectors straight to document.querySelectorAll, unlike
     // Playwright's own selector engine).
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
+    const nreumType = await page.evaluate(() => typeof window.NREUM).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: typeof window.NREUM = ${nreumType}`)
+    const webdriverFlag = await page.evaluate(() => navigator.webdriver).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: navigator.webdriver = ${webdriverFlag}`)
+    const userAgent = await page.evaluate(() => navigator.userAgent).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: navigator.userAgent = ${userAgent}`)
+    const hasLoaderTag = await page.evaluate(() => !!document.querySelector('script[src*="js-agent.nr-assets.net"]')).catch(e => `eval-error: ${e}`)
+    const beaconFetch = await page.evaluate(async () => {
+        try {
+            const r = await fetch('https://bam.nr-data.net/', { method: 'GET' })
+            return `status=${r.status} type=${r.type}`
+        } catch (e) {
+            return `fetch-error=${e}`
+        }
+    }).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: in-browser fetch to bam.nr-data.net = ${beaconFetch}`)
+    const beaconFetchNoCors = await page.evaluate(async () => {
+        try {
+            const r = await fetch('https://bam.nr-data.net/', { method: 'GET', mode: 'no-cors' })
+            return `status=${r.status} type=${r.type}`
+        } catch (e) {
+            return `fetch-error=${e}`
+        }
+    }).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: in-browser no-cors fetch to bam.nr-data.net = ${beaconFetchNoCors}`)
+    const sameOriginFetch = await page.evaluate(async () => {
+        try {
+            const r = await fetch('/', { method: 'GET' })
+            return `status=${r.status} type=${r.type}`
+        } catch (e) {
+            return `fetch-error=${e}`
+        }
+    }).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: in-browser same-origin fetch to / = ${sameOriginFetch}`)
+    console.log(`DIAG: loader script tag present = ${hasLoaderTag}`)
     await page.waitForSelector('a[href="/product/2ZYFJ3GM2N"]', { timeout: 15000 })
     await page.click('a[href="/product/2ZYFJ3GM2N"]')
     // The product-link click is a client-side (SPA/pushState) route change, not
@@ -295,6 +331,16 @@ async function addProductToCartBrowser(page) {
     await page.waitForSelector('[data-cy="product-add-to-cart"]', { timeout: 25000 })
     await page.click('[data-cy="product-add-to-cart"]')
     await page.waitForTimeout(2000)
+    const nrRequests = await page.evaluate(() => {
+        return performance.getEntriesByType('resource')
+            .filter(e => e.name.includes('nr-data.net') || e.name.includes('nr-assets.net'))
+            .map(e => e.name)
+    }).catch(e => [`eval-error: ${e}`])
+    console.log(`DIAG: agent's own NR-related resource entries (${nrRequests.length}) = ${JSON.stringify(nrRequests)}`)
+    const allResourceCount = await page.evaluate(() => performance.getEntriesByType('resource').length).catch(e => `eval-error: ${e}`)
+    console.log(`DIAG: total resource entries on page = ${allResourceCount}`)
+    const nrCalls = await page.evaluate(() => window.__nrCalls || []).catch(e => [`eval-error: ${e}`])
+    console.log(`DIAG: intercepted sendBeacon/fetch/xhr calls (${nrCalls.length}) = ${JSON.stringify(nrCalls)}`)
 }
 
 // ---- browser entrypoint -----------------------------------------------------
@@ -310,6 +356,37 @@ export async function browserScenario() {
     // storage across every simulated "user" for the VU's entire 9999h
     // lifetime, which breaks the RUM agent's session bookkeeping over time.
     const context = await browser.newContext()
+    // RUM/analytics agents commonly check navigator.webdriver to silently
+    // suppress reporting from automated browsers (both k6 and Playwright set
+    // this true by default via CDP). Override it before any page script runs,
+    // so the New Relic Browser agent's own init doesn't see an automation flag
+    // and decide not to send beacons.
+    await context.addInitScript(`
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        window.__nrCalls = [];
+        var origSendBeacon = navigator.sendBeacon ? navigator.sendBeacon.bind(navigator) : null;
+        if (origSendBeacon) {
+            navigator.sendBeacon = function(url, data) {
+                window.__nrCalls.push('sendBeacon:' + String(url));
+                return origSendBeacon(url, data);
+            };
+        }
+        var origFetch = window.fetch.bind(window);
+        window.fetch = function() {
+            window.__nrCalls.push('fetch:' + String(arguments[0]));
+            return origFetch.apply(window, arguments);
+        };
+        var OrigXHR = window.XMLHttpRequest;
+        window.XMLHttpRequest = function() {
+            var xhr = new OrigXHR();
+            var origOpen = xhr.open.bind(xhr);
+            xhr.open = function(method, url) {
+                window.__nrCalls.push('xhr:' + String(url));
+                return origOpen.apply(xhr, arguments);
+            };
+            return xhr;
+        };
+    `)
     const page = await context.newPage()
     const isCurrencyChange = cryptoRandom() < 0.5
     const span = tracer.startSpan(isCurrencyChange ? 'browser_change_currency' : 'browser_add_to_cart')
