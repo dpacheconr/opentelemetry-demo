@@ -311,10 +311,41 @@ export async function browserScenario() {
     // lifetime, which breaks the RUM agent's session bookkeeping over time.
     const context = await browser.newContext()
     const page = await context.newPage()
+    // Tag first-party requests as synthetic via baggage (checkout/payment
+    // annotate spans based on this - see telemetry-schema/services/) the
+    // same way the pre-k6 Locust/Playwright load-generator did, but scoped
+    // to same-origin only. The old code (and, until this fix, this one)
+    // added the header via a global page.setExtraHTTPHeaders/page.route
+    // matching every request including third-party ones. A custom header
+    // on a cross-origin request is a non-simple request under the Fetch
+    // spec, forcing a real CORS preflight; k6-browser (like the old
+    // Playwright-based runner) drives the page through CDP, which loses
+    // Chromium's normal "simple cross-origin request" fast path once a
+    // custom header is present. New Relic's CDN doesn't answer OPTIONS
+    // preflights on its RUM agent's chunk-loading domains, so that
+    // preflight failed and the agent's harvester chunk (where its
+    // fetch/XHR/sendBeacon calls to New Relic actually happen) never
+    // loaded - even though the base agent initialized fine. The same
+    // bug independently broke loading Google Fonts under k6/Playwright.
+    // Scoping the header to same-origin only avoids triggering a
+    // preflight for any third-party resource in the first place.
+    await page.route('**/*', async (route) => {
+        const req = route.request()
+        if (req.url().startsWith(BASE_URL)) {
+            const existingBaggage = req.headers()['baggage'] || ''
+            await route.continue({
+                headers: {
+                    ...req.headers(),
+                    baggage: [existingBaggage, 'synthetic_request=true'].filter(Boolean).join(', '),
+                },
+            })
+        } else {
+            await route.continue()
+        }
+    })
     const isCurrencyChange = cryptoRandom() < 0.5
     const span = tracer.startSpan(isCurrencyChange ? 'browser_change_currency' : 'browser_add_to_cart')
     try {
-        await page.setExtraHTTPHeaders({ baggage: 'synthetic_request=true' })
         if (isCurrencyChange) {
             span.log('Currency changed to CHF')
             await changeCurrency(page)
@@ -326,15 +357,26 @@ export async function browserScenario() {
         console.error(`browser task error: ${e}`)
     } finally {
         span.end()
-        // INP is only finalized/sent by the RUM agent on visibilitychange/
-        // pagehide. context.close() tears the page down abruptly enough
-        // that the agent's beacon can get cut off mid-flight; force the
-        // event and give it a moment to actually hit the network first.
+        // INP/RUM beacons are only finalized/sent by the New Relic browser
+        // agent when its visibilitychange handler observes
+        // document.visibilityState === "hidden" (checked inside the
+        // handler, not inferred from the event alone). Dispatching a bare
+        // 'visibilitychange' event does not change that real,
+        // browser-computed property, so the agent's check silently failed
+        // and no beacon was ever sent before context.close() tore the page
+        // down. Override the getters first so the agent's own check passes.
         await page.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { get: () => 'hidden', configurable: true })
+            Object.defineProperty(document, 'hidden', { get: () => true, configurable: true })
             document.dispatchEvent(new Event('visibilitychange'))
             window.dispatchEvent(new Event('pagehide'))
         }).catch(() => {})
-        await page.waitForTimeout(300)
+        // 300ms is nowhere near enough dwell time for the RUM agent's
+        // session-trace blob harvest to actually flush (observed 6-20s
+        // between harvests in a real browser session) - confirmed via a
+        // prior test run that this alone is what makes sessions land in
+        // New Relic Browser at all, independent of the visibilityState fix.
+        await page.waitForTimeout(8000)
         await context.close()
     }
 
