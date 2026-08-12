@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use actix_web::{web, App, HttpResponse, HttpServer};
-use open_feature::provider::FeatureProvider;
+use open_feature::provider::{FeatureProvider, NoOpProvider};
 use open_feature_flagd::{FlagdOptions, FlagdProvider};
 use opentelemetry_instrumentation_actix_web::{RequestMetrics, RequestTracing};
 use std::env;
@@ -47,14 +47,23 @@ async fn main() -> std::io::Result<()> {
         message = "Shipping service is running"
     );
 
-    let provider = FlagdProvider::new(FlagdOptions {
+    let provider: Arc<dyn FeatureProvider> = match FlagdProvider::new(FlagdOptions {
         cache_settings: None,
         ..Default::default()
     })
     .await
-    .expect("Failed to initialize flagd provider");
+    {
+        Ok(provider) => Arc::new(provider),
+        Err(err) => {
+            tracing::error!(
+                error = %err,
+                "Failed to initialize flagd provider, continuing without feature flags"
+            );
+            Arc::new(NoOpProvider::default())
+        }
+    };
 
-    let flag_provider = web::Data::from(Arc::new(provider) as Arc<dyn FeatureProvider>);
+    let flag_provider = web::Data::from(provider);
 
     HttpServer::new(move || {
         App::new()
