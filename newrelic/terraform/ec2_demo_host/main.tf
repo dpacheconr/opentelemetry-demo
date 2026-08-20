@@ -64,6 +64,46 @@ resource "aws_key_pair" "demo_host" {
   public_key = file(var.public_key_path)
 }
 
+resource "aws_ssm_parameter" "new_relic_license_key" {
+  name        = "/${var.name_prefix}/new-relic-license-key"
+  description = "New Relic license key for the OpenTelemetry demo, read by the instance at boot"
+  type        = "SecureString"
+  value       = var.new_relic_license_key
+}
+
+data "aws_iam_policy_document" "instance_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "demo_host" {
+  name               = "${var.name_prefix}-role"
+  assume_role_policy = data.aws_iam_policy_document.instance_assume_role.json
+}
+
+data "aws_iam_policy_document" "read_license_key" {
+  statement {
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.new_relic_license_key.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "read_license_key" {
+  name   = "${var.name_prefix}-read-license-key"
+  role   = aws_iam_role.demo_host.id
+  policy = data.aws_iam_policy_document.read_license_key.json
+}
+
+resource "aws_iam_instance_profile" "demo_host" {
+  name = "${var.name_prefix}-profile"
+  role = aws_iam_role.demo_host.name
+}
+
 resource "aws_security_group" "demo_host" {
   name        = "${var.name_prefix}-sg"
   description = "SSH and frontend-proxy access for the OpenTelemetry demo minikube host"
@@ -97,23 +137,84 @@ resource "aws_security_group" "demo_host" {
   }
 }
 
-resource "aws_instance" "demo_host" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.instance_type
-  key_name                    = aws_key_pair.demo_host.key_name
-  subnet_id                   = aws_subnet.demo_host.id
-  vpc_security_group_ids      = [aws_security_group.demo_host.id]
-  associate_public_ip_address = true
+resource "aws_launch_template" "demo_host" {
+  name_prefix   = "${var.name_prefix}-lt-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  key_name      = aws_key_pair.demo_host.key_name
 
-  root_block_device {
-    volume_size = var.root_volume_size
-    volume_type = "gp3"
+  iam_instance_profile {
+    arn = aws_iam_instance_profile.demo_host.arn
   }
 
-  user_data                   = file("${path.module}/user_data.sh.tpl")
-  user_data_replace_on_change = false
-
-  tags = {
-    Name = "${var.name_prefix}-host"
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.demo_host.id]
+    subnet_id                   = aws_subnet.demo_host.id
   }
+
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size = var.root_volume_size
+      volume_type = "gp3"
+    }
+  }
+
+  user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
+    otel_demo_values             = file("${path.module}/../../k8s/helm/opentelemetry-demo.yaml")
+    nr_k8s_otel_collector_values = file("${path.module}/../../k8s/helm/nr-k8s-otel-collector.yaml")
+    ssm_license_key_param        = aws_ssm_parameter.new_relic_license_key.name
+    aws_region                   = var.region
+    new_relic_region             = var.new_relic_region
+    otel_demo_chart_version      = var.otel_demo_chart_version
+    nr_k8s_chart_version         = var.nr_k8s_chart_version
+  }))
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "${var.name_prefix}-host"
+    }
+  }
+}
+
+resource "aws_autoscaling_group" "demo_host" {
+  name                = "${var.name_prefix}-asg"
+  vpc_zone_identifier = [aws_subnet.demo_host.id]
+  min_size            = 1
+  max_size            = 1
+  desired_capacity    = 1
+  health_check_type   = "EC2"
+
+  launch_template {
+    id      = aws_launch_template.demo_host.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "${var.name_prefix}-host"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_schedule" "stop_weekend" {
+  scheduled_action_name  = "${var.name_prefix}-stop-weekend"
+  autoscaling_group_name = aws_autoscaling_group.demo_host.name
+  min_size               = 0
+  max_size               = 0
+  desired_capacity       = 0
+  recurrence             = "0 20 * * FRI"
+  time_zone              = "UTC"
+}
+
+resource "aws_autoscaling_schedule" "start_weekday" {
+  scheduled_action_name  = "${var.name_prefix}-start-weekday"
+  autoscaling_group_name = aws_autoscaling_group.demo_host.name
+  min_size               = 1
+  max_size               = 1
+  desired_capacity       = 1
+  recurrence             = "0 6 * * MON"
+  time_zone              = "UTC"
 }

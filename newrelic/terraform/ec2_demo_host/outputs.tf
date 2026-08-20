@@ -1,19 +1,14 @@
-output "public_ip" {
-  description = "Public IP address of the EC2 host"
-  value       = aws_instance.demo_host.public_ip
+output "autoscaling_group_name" {
+  description = "Name of the Auto Scaling Group managing the demo host"
+  value       = aws_autoscaling_group.demo_host.name
 }
 
-output "public_dns" {
-  description = "Public DNS name of the EC2 host"
-  value       = aws_instance.demo_host.public_dns
+output "find_current_ip_command" {
+  description = "AWS CLI command to look up the current instance's public IP (changes on every scheduled restart)"
+  value       = "aws ec2 describe-instances --region ${var.region} --filters Name=tag:Name,Values=${var.name_prefix}-host Name=instance-state-name,Values=running --query 'Reservations[0].Instances[0].PublicIpAddress' --output text"
 }
 
-output "ssh_command" {
-  description = "Command to SSH into the EC2 host"
-  value       = "ssh ubuntu@${aws_instance.demo_host.public_ip}"
-}
-
-output "frontend_url" {
-  description = "URL for the demo storefront once frontend-proxy is port-forwarded on the host"
-  value       = "http://${aws_instance.demo_host.public_ip}:8080"
+output "schedule" {
+  description = "When the instance is running"
+  value       = "Runs weekdays 06:00-20:00 UTC (Mon-Fri), stopped (0 instances) on weekends"
 }
