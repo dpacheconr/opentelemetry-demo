@@ -210,6 +210,26 @@ components:
                     await page.waitForSelector('[data-cy="product-add-to-cart"]', { timeout: 25000 })
                     await page.click('[data-cy="product-add-to-cart"]')
                     await page.waitForTimeout(2000)
+                }
+
+                async function viewProductPageBrowser(page) {
+                    // Unlike addProductToCartBrowser, this navigates straight to the
+                    // product URL (a real document load) rather than reaching it via
+                    // a client-side pushState click from "/". A pushState transition
+                    // never fires a new document load, so the RUM agent never records
+                    // /product/{id} as its own Page URL or gives it its own Web
+                    // Vitals - New Relic only ever showed "/" and "/cart" for that
+                    // reason. A direct goto is also what lets imageSlowLoad's delay
+                    // (an x-envoy-fault-delay-request header ProductCard sends on
+                    // every product image fetch, not just one product) actually
+                    // surface as a degraded LCP for this URL, instead of being masked
+                    // inside the "/" page's own LCP.
+                    const product = randomChoice(products)
+                    await Promise.all([
+                        page.waitForResponse(/\\/images\\/products\\//, { timeout: 25000 }),
+                        page.goto(`${BASE_URL}/product/${product}`, { waitUntil: 'domcontentloaded' }),
+                    ])
+                    await page.waitForTimeout(2000)
                 }""")
 
             orig_scenario = textwrap.dedent("""\
@@ -305,15 +325,24 @@ components:
                             return result
                         }
                     })
-                    const isCurrencyChange = cryptoRandom() < 0.5
-                    const span = tracer.startSpan(isCurrencyChange ? 'browser_change_currency' : 'browser_add_to_cart')
+                    const r = cryptoRandom()
+                    const task = r < 1 / 3 ? 'currency' : r < 2 / 3 ? 'add_to_cart' : 'view_product'
+                    const spanName = {
+                        currency: 'browser_change_currency',
+                        add_to_cart: 'browser_add_to_cart',
+                        view_product: 'browser_view_product',
+                    }[task]
+                    const span = tracer.startSpan(spanName)
                     try {
-                        if (isCurrencyChange) {
+                        if (task === 'currency') {
                             span.log('Currency changed to CHF')
                             await changeCurrency(page)
-                        } else {
+                        } else if (task === 'add_to_cart') {
                             span.log('Product added to cart successfully')
                             await addProductToCartBrowser(page)
+                        } else {
+                            span.log('Viewed product page via direct navigation')
+                            await viewProductPageBrowser(page)
                         }
                     } catch (e) {
                         console.error(`browser task error: ${e}`)
