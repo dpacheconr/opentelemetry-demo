@@ -219,16 +219,39 @@ components:
                     // never fires a new document load, so the RUM agent never records
                     // /product/{id} as its own Page URL or gives it its own Web
                     // Vitals - New Relic only ever showed "/" and "/cart" for that
-                    // reason. A direct goto is also what lets imageSlowLoad's delay
-                    // (an x-envoy-fault-delay-request header ProductCard sends on
-                    // every product image fetch, not just one product) actually
-                    // surface as a degraded LCP for this URL, instead of being masked
-                    // inside the "/" page's own LCP.
+                    // reason.
+                    //
+                    // Do NOT use page.route()/context.route() here (or anywhere in
+                    // this scenario) to inject a delay header on this navigation -
+                    // this k6-browser version's CDP Fetch-domain interception has the
+                    // same "VU never reclaimed for a second iteration" bug documented
+                    // above for the baggage header: it silently stalls this VU
+                    // forever the first time it fires, permanently killing every
+                    // future browser iteration (currency/add_to_cart/view_product
+                    // alike), not just this one. Confirmed by reproducing it live:
+                    // one successful delayed load, then zero further iterations.
+                    //
+                    // The product hero image itself can't be used to demonstrate a
+                    // real LCP regression either: it's rendered via fetch()+blob()+
+                    // background-image (ProductCard/ProductDetail), which browsers
+                    // never treat as an LCP candidate since blob: URLs bypass the
+                    // real image resource pipeline the LCP algorithm hooks into.
+                    //
+                    // So the delay is applied server-side instead: frontend-proxy's
+                    // envoy.tmpl.yaml (see the frontend-proxy component override
+                    // above) has an extra route that fixed_delay's any /product/
+                    // request carrying a `slowLcp` query param - a plain query
+                    // param needs no CDP interception at all, so it can't trigger
+                    // the route()/VU-stall bug. Delaying the document delays every
+                    // paint on the page, guaranteeing a real LCP/FCP regression for
+                    // this URL. Gated on imageSlowLoad exactly like every other
+                    // chaos scenario in this demo - off by default.
                     const product = randomChoice(products)
-                    await Promise.all([
-                        page.waitForResponse(/\\/images\\/products\\//, { timeout: 25000 }),
-                        page.goto(`${BASE_URL}/product/${product}`, { waitUntil: 'domcontentloaded' }),
-                    ])
+                    const delayMs = getFlagdValue('imageSlowLoad')
+                    const url = delayMs > 0
+                        ? `${BASE_URL}/product/${product}?slowLcp=${delayMs}`
+                        : `${BASE_URL}/product/${product}`
+                    await page.goto(url, { waitUntil: 'domcontentloaded' })
                     await page.waitForTimeout(2000)
                 }""")
 
@@ -391,7 +414,85 @@ components:
           - name: patched-script
             mountPath: /patched
 
-# Disable non-NR components
+
+  frontend-proxy:
+    additionalVolumes:
+      - name: patched-envoy-config
+        emptyDir: {}
+    additionalVolumeMounts:
+      - name: patched-envoy-config
+        mountPath: /home/envoy/envoy.tmpl.yaml
+        subPath: envoy.tmpl.yaml
+    initContainers:
+      # Same two-stage copy+patch pattern as the load-generator script.js
+      # patch above, for the same reason: copy the shipped envoy.tmpl.yaml
+      # out of the actual frontend-proxy image so this tracks upstream
+      # changes instead of vendoring a full copy here, then transform it
+      # with a small Python container since the envoy image has no python3.
+      - name: copy-envoy-config
+        image: ghcr.io/open-telemetry/demo:3.0.0-frontend-proxy
+        command:
+          - sh
+          - -c
+          - cp /home/envoy/envoy.tmpl.yaml /patched/envoy.tmpl.yaml
+        volumeMounts:
+          - name: patched-envoy-config
+            mountPath: /patched
+      - name: patch-envoy-config
+        image: docker.io/library/python:3.12-slim
+        command:
+          - python
+          - -c
+          - |
+            with open('/patched/envoy.tmpl.yaml', 'r') as f:
+                content = f.read()
+
+            # Insert the slowLcp fault-injection route right before the
+            # catch-all route, so unmatched /product/ traffic (no query
+            # param) keeps falling through to the catch-all exactly as
+            # before.
+            #
+            # No textwrap.dedent() here - the YAML block scalar above already
+            # strips this block's own outer nesting indentation before Python
+            # ever sees it, so these strings already carry the envoy file's
+            # real absolute indentation (24/26 spaces). Dedenting again would
+            # strip that too, and the exact-text match below would never hit.
+            orig_route = ("""\
+                                    - match: { prefix: "/" }  # Default/catch-all route - keep last since prefix:"/" matches everything
+                                      route: { cluster: frontend }""")
+
+            new_route = ("""\
+                                    # EXPERIMENTAL: server-side-only LCP degradation for
+                                    # testing - matched only when the client adds
+                                    # ?slowLcp=<ms>, so normal /product/ traffic (no query
+                                    # param) falls through to the catch-all route below
+                                    # exactly as before.
+                                    - match:
+                                        prefix: "/product/"
+                                        query_parameters:
+                                          - name: slowLcp
+                                            present_match: true
+                                      typed_per_filter_config:
+                                        envoy.filters.http.fault:
+                                          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                                          delay:
+                                            fixed_delay: 10s
+                                            percentage:
+                                              numerator: 100
+                                      route: { cluster: frontend }
+                                    - match: { prefix: "/" }  # Default/catch-all route - keep last since prefix:"/" matches everything
+                                      route: { cluster: frontend }""")
+
+            assert orig_route in content, 'catch-all route text not found - upstream envoy.tmpl.yaml changed'
+
+            content = content.replace(orig_route, new_route)
+
+            with open('/patched/envoy.tmpl.yaml', 'w') as f:
+                f.write(content)
+        volumeMounts:
+          - name: patched-envoy-config
+            mountPath: /patched
+
 opensearch:
   enabled: false
 grafana:
