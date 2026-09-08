@@ -18,7 +18,7 @@ echo "[1/3] Rendering nr-k8s-otel-collector ($NR_K8S_CHART_VERSION)..."
 
 RENDERED=$(mktemp)
 CONFIG=$(mktemp)
-trap "rm -f $RENDERED $CONFIG" EXIT
+trap 'rm -f "$RENDERED" "$CONFIG"' EXIT
 
 helm template nr-k8s-otel-collector newrelic/nr-k8s-otel-collector \
     --version "$NR_K8S_CHART_VERSION" \
