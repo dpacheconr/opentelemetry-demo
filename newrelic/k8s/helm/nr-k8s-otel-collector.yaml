@@ -352,3 +352,4 @@ deployment:
             - batch
           exporters:
             - otlp_http/newrelic
+# Test PR for chart validation CI job
