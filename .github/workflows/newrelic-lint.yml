@@ -83,7 +83,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y yq
-          wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.160.0/otelcontribcol_0.160.0_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz
+          # Extract collector version from values file
+          COLLECTOR_VERSION=$(yq '.images.collector.tag' newrelic/k8s/helm/nr-k8s-otel-collector.yaml)
+          echo "Using otelcol version: $COLLECTOR_VERSION"
+          wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${COLLECTOR_VERSION}/otelcontribcol_${COLLECTOR_VERSION}_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz
           tar -xzf /tmp/otelcol.tar.gz -C /tmp/
           sudo mv /tmp/otelcontribcol /usr/local/bin/
           sudo chmod +x /usr/local/bin/otelcontribcol
