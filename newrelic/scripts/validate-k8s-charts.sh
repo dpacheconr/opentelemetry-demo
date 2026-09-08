@@ -27,7 +27,7 @@ helm template nr-k8s-otel-collector newrelic/nr-k8s-otel-collector \
     -f "$NR_K8S_VALUES_PATH" > "$RENDERED"
 
 # Extract collector config from ConfigMap
-yq 'select(.kind == "ConfigMap" and (.metadata.name | test("otel-collector"))) | .data | to_entries | .[] | select(.key | test("config")) | .value' "$RENDERED" > "$CONFIG"
+yq -r 'select(.kind == "ConfigMap" and (.metadata.name | test("otel-collector"))) | .data | to_entries | .[] | select(.key | test("config")) | .value' "$RENDERED" > "$CONFIG"
 
 if [ ! -s "$CONFIG" ]; then
     echo "ERROR: Could not extract collector config"
@@ -50,13 +50,19 @@ fi
 echo ""
 echo "[2/2] Checking for stale rendered manifest..."
 
-if ! diff -q <(sed 's/[[:space:]]*$//' "$RENDERED" | sed '/^$/d') \
-             <(sed 's/[[:space:]]*$//' "$NR_K8S_RENDERED_PATH" | sed '/^$/d') > /dev/null 2>&1; then
+DIFF=$(diff -u <(sed 's/[[:space:]]*$//' "$NR_K8S_RENDERED_PATH" | sed '/^$/d') \
+               <(sed 's/[[:space:]]*$//' "$RENDERED" | sed '/^$/d') || true)
+
+if [ -n "$DIFF" ]; then
     echo "ERROR: Rendered manifest differs from committed"
     echo "This means:"
     echo "  - Chart version changed"
     echo "  - Values changed (including custom extraConfig)"
     echo "  - Something is broken"
+    echo ""
+    echo "--- committed ($NR_K8S_RENDERED_PATH)"
+    echo "+++ freshly rendered"
+    echo "$DIFF"
     echo ""
     echo "Fix: Run newrelic/scripts/update-k8s.sh to re-render"
     exit 1
