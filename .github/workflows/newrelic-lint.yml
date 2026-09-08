@@ -89,15 +89,27 @@ jobs:
           COLLECTOR_VERSION=$(yq -r '.images.collector.tag' newrelic/k8s/helm/nr-k8s-otel-collector.yaml)
           echo "Using otelcol version: $COLLECTOR_VERSION"
 
-          # Try to download and install otelcol (optional - validation skips if not available)
-          if wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${COLLECTOR_VERSION}/otelcontribcol_${COLLECTOR_VERSION}_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz 2>/dev/null; then
-            tar -xzf /tmp/otelcol.tar.gz -C /tmp/ 2>/dev/null && \
-            sudo mv /tmp/otelcontribcol /usr/local/bin/ 2>/dev/null && \
-            sudo chmod +x /usr/local/bin/otelcontribcol 2>/dev/null && \
-            echo "otelcol installed successfully" || \
-            echo "Warning: Failed to install otelcol, validation will skip binary checks"
+          # Try to download and install otelcol-contrib matching the configured
+          # version. Fall back to the latest release (with a warning) if that
+          # exact version's asset isn't published; skip binary validation
+          # entirely (also with a warning) if even that fails.
+          install_otelcol() {
+            local ref="$1"
+            wget -q "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/${ref}/otelcol-contrib_${2}_linux_amd64.tar.gz" -O /tmp/otelcol.tar.gz 2>/dev/null || return 1
+            tar -xzf /tmp/otelcol.tar.gz -C /tmp/ 2>/dev/null || return 1
+            sudo mv /tmp/otelcol-contrib /usr/local/bin/otelcol 2>/dev/null || return 1
+            sudo chmod +x /usr/local/bin/otelcol 2>/dev/null || return 1
+          }
+
+          if install_otelcol "v${COLLECTOR_VERSION}" "${COLLECTOR_VERSION}"; then
+            echo "otelcol installed (version $COLLECTOR_VERSION, matches configured collector)"
           else
-            echo "Warning: otelcol release not found for v${COLLECTOR_VERSION}, validation will skip binary checks"
+            LATEST_VERSION=$(curl -s https://api.github.com/repos/open-telemetry/opentelemetry-collector-releases/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+            if [ -n "$LATEST_VERSION" ] && install_otelcol "v${LATEST_VERSION}" "${LATEST_VERSION}"; then
+              echo "::warning::otelcol v${COLLECTOR_VERSION} release asset not found; installed latest (v${LATEST_VERSION}) instead"
+            else
+              echo "::warning::Could not install any otelcol release; validation will skip binary checks"
+            fi
           fi
 
       - name: Add Helm repositories

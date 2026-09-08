@@ -26,8 +26,11 @@ helm template nr-k8s-otel-collector newrelic/nr-k8s-otel-collector \
     --create-namespace \
     -f "$NR_K8S_VALUES_PATH" > "$RENDERED"
 
-# Extract collector config from ConfigMap
-yq -r 'select(.kind == "ConfigMap" and (.metadata.name | test("otel-collector"))) | .data | to_entries | .[] | select(.key | test("config")) | .value' "$RENDERED" > "$CONFIG"
+# Extract collector config from the deployment ConfigMap (carries our custom
+# extraConfig). The daemonset ConfigMap also matches "otel-collector" and has
+# its own "*-config.yaml" key, so scope the name match to "deployment-config"
+# to avoid concatenating two independent configs into one file.
+yq -r 'select(.kind == "ConfigMap" and (.metadata.name | test("deployment-config"))) | .data | to_entries | .[] | select(.key | test("config")) | .value' "$RENDERED" > "$CONFIG"
 
 if [ ! -s "$CONFIG" ]; then
     echo "ERROR: Could not extract collector config"
