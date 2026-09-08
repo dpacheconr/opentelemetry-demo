@@ -88,10 +88,10 @@ jobs:
           # Extract collector version from values file
           COLLECTOR_VERSION=$(yq -r '.images.collector.tag' newrelic/k8s/helm/nr-k8s-otel-collector.yaml)
           echo "Using otelcol version: $COLLECTOR_VERSION"
-          wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${COLLECTOR_VERSION}/otelcontribcol_${COLLECTOR_VERSION}_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz
+          wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${COLLECTOR_VERSION}/otelcol-contrib_${COLLECTOR_VERSION}_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz
           tar -xzf /tmp/otelcol.tar.gz -C /tmp/
-          sudo mv /tmp/otelcontribcol /usr/local/bin/
-          sudo chmod +x /usr/local/bin/otelcontribcol
+          sudo mv /tmp/otelcol-contrib /usr/local/bin/
+          sudo chmod +x /usr/local/bin/otelcol-contrib
 
       - name: Add Helm repositories
         run: |

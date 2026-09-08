@@ -36,15 +36,15 @@ echo "✓ Chart rendered and config extracted"
 echo ""
 echo "[2/3] Validating config..."
 
-if command -v otelcol &> /dev/null; then
-    if ! otelcol validate --config "$CONFIG" > /dev/null 2>&1; then
+if command -v otelcol-contrib &> /dev/null; then
+    if ! otelcol-contrib validate --config "$CONFIG" > /dev/null 2>&1; then
         echo "ERROR: otelcol validation failed"
-        otelcol validate --config "$CONFIG"
+        otelcol-contrib validate --config "$CONFIG"
         exit 1
     fi
-    echo "✓ Config valid (otelcol)"
+    echo "✓ Config valid (otelcol-contrib)"
 else
-    echo "⊘ otelcol not available (validation skipped)"
+    echo "⊘ otelcol-contrib not available (validation skipped)"
 fi
 
 # Verify custom extraConfig present
