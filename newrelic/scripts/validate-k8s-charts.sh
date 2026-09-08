@@ -36,6 +36,13 @@ echo "✓ Chart rendered and config extracted"
 echo ""
 echo "[2/3] Validating config..."
 
+# Runtime-only values the config checks eagerly - stub them so validation
+# reflects the config, not the environment it's run in.
+export POSTGRES_USERNAME="stub"
+export POSTGRES_PASSWORD="stub"
+sudo mkdir -p /var/run/secrets/kubernetes.io/serviceaccount
+echo "stub" | sudo tee /var/run/secrets/kubernetes.io/serviceaccount/token > /dev/null
+
 if command -v otelcol-contrib &> /dev/null; then
     if ! otelcol-contrib validate --config "$CONFIG" > /dev/null 2>&1; then
         echo "ERROR: otelcol validation failed"
