@@ -23,7 +23,7 @@ helm template nr-k8s-otel-collector newrelic/nr-k8s-otel-collector \
     -f "$NR_K8S_VALUES_PATH" > "$RENDERED"
 
 # Extract collector config from ConfigMap
-yq 'select(.kind == "ConfigMap" and (.metadata.name | contains("deployment-config"))) | .data | to_entries | .[] | select(.key | contains("config")) | .value' "$RENDERED" > "$CONFIG"
+yq -r 'select(.kind == "ConfigMap" and (.metadata.name | contains("deployment-config"))) | .data | to_entries | .[] | select(.key | contains("config")) | .value' "$RENDERED" > "$CONFIG"
 
 if [ ! -s "$CONFIG" ]; then
     echo "ERROR: Could not extract collector config"
