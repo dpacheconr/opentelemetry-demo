@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NR_K8S_CHART_VERSION="${NR_K8S_CHART_VERSION:-}"
+source "$(dirname "$0")/common.sh"
+
 NR_K8S_VALUES_PATH="${NR_K8S_VALUES_PATH:-newrelic/k8s/helm/nr-k8s-otel-collector.yaml}"
 NR_K8S_RENDERED_PATH="${NR_K8S_RENDERED_PATH:-newrelic/k8s/rendered/nr-k8s-otel-collector.yaml}"
-
-if [ -z "$NR_K8S_CHART_VERSION" ]; then
-    echo "ERROR: NR_K8S_CHART_VERSION not set"
-    exit 1
-fi
 
 echo "Validating NR K8s chart configuration..."
 
