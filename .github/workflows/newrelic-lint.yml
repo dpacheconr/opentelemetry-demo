@@ -83,10 +83,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y yq
-          mkdir -p /tmp/otelcol
-          curl -L https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.160.0/otelcontribcol_0.160.0_linux_amd64.tar.gz | tar xz -C /tmp/otelcol
-          sudo mv /tmp/otelcol/otelcontribcol /usr/local/bin/
-          chmod +x /usr/local/bin/otelcontribcol
+          wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.160.0/otelcontribcol_0.160.0_linux_amd64.tar.gz -O /tmp/otelcol.tar.gz
+          tar -xzf /tmp/otelcol.tar.gz -C /tmp/
+          sudo mv /tmp/otelcontribcol /usr/local/bin/
+          sudo chmod +x /usr/local/bin/otelcontribcol
 
       - name: Add Helm repositories
         run: |
