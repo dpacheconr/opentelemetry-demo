@@ -272,7 +272,7 @@ deployment:
         # Spanmetrics are being used to populate the Summary UIs for services that do not publish metrics by default
         metrics/spanmetrics:
           exporters:
-            - otlp_http/newrelic_broken
+            - otlp_http/newrelic
           processors:
             - memory_limiter
             - filter/drop-spanmetrics-services
@@ -283,7 +283,7 @@ deployment:
 
         metrics/postgres:
           exporters:
-            - otlp_http/newrelic_dangling
+            - otlp_http/newrelic
           processors:
             - memory_limiter
             - k8s_attributes/ksm
@@ -298,7 +298,7 @@ deployment:
         # carries the postgresql.* metrics.
         logs/postgres:
           exporters:
-            - otlp_http/newrelic_dangling
+            - otlp_http/newrelic
           processors:
             - memory_limiter
             - k8s_attributes/ksm
@@ -324,12 +324,12 @@ deployment:
             - cumulativetodelta
             - batch
           exporters:
-            - otlp_http/newrelic_dangling
+            - otlp_http/newrelic
 
         traces/otel-demo:
           exporters:
             - spanmetrics
-            - otlp_http/newrelic_dangling
+            - otlp_http/newrelic
           processors:
             - memory_limiter
             - resourcedetection/otel-demo
@@ -351,4 +351,4 @@ deployment:
             - transform/otel-demo
             - batch
           exporters:
-            - otlp_http/newrelic_dangling
+            - otlp_http/newrelic
