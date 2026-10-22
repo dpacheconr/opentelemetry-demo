@@ -58,10 +58,19 @@ func handleK8s(action string, cfg *Config) {
 	ns := Charts["otel-demo"].NS
 
 	if action == "uninstall" {
-		runCommand("helm", []string{"uninstall", Charts["otel-demo"].Name, "-n", ns}, nil)
-		runCommand("helm", []string{"uninstall", Charts["nr-k8s"].Name, "-n", ns}, nil)
-		runCommand("helm", []string{"uninstall", Charts["kube-stack"].Name, "-n", ns}, nil)
-		runCommand("kubectl", []string{"delete", "ns", ns}, nil)
+		collector := uninstallCollector(ns)
+		for _, key := range []string{"otel-demo", collector} {
+			if helmReleaseExists(Charts[key].Name, ns) {
+				runCommand("helm", []string{"uninstall", Charts[key].Name, "-n", ns}, nil)
+			} else {
+				fmt.Printf("Release '%s' is not installed in namespace '%s'; skipping.\n", Charts[key].Name, ns)
+			}
+		}
+		if out, err := exec.Command("helm", "list", "-n", ns, "-q").Output(); err == nil && strings.TrimSpace(string(out)) == "" {
+			runCommand("kubectl", []string{"delete", "ns", ns}, nil)
+		} else {
+			fmt.Printf("Other Helm releases remain in namespace '%s'; keeping the namespace.\n", ns)
+		}
 		return
 	}
 
@@ -112,6 +121,31 @@ func handleK8s(action string, cfg *Config) {
 func k8sCollector() string {
 	if c := os.Getenv("K8S_COLLECTOR"); c != "" {
 		return c
+	}
+	return "nr-k8s"
+}
+
+// helmReleaseExists reports whether a Helm release is installed in the namespace.
+func helmReleaseExists(name, ns string) bool {
+	return exec.Command("helm", "status", name, "-n", ns).Run() == nil
+}
+
+// uninstallCollector picks the collector release to remove: K8S_COLLECTOR when
+// set, otherwise whichever one is installed, asking only if both are.
+func uninstallCollector(ns string) string {
+	if os.Getenv("K8S_COLLECTOR") != "" {
+		return normalizeCollector(os.Getenv("K8S_COLLECTOR"))
+	}
+	nr := helmReleaseExists(Charts["nr-k8s"].Name, ns)
+	ks := helmReleaseExists(Charts["kube-stack"].Name, ns)
+	switch {
+	case ks && !nr:
+		return "kube-stack"
+	case nr && ks:
+		fmt.Println("\n>>> Both collectors are installed.")
+		fmt.Println("  1. nr-k8s-otel-collector")
+		fmt.Println("  2. opentelemetry-kube-stack")
+		return normalizeCollector(promptUser("Choose the collector to uninstall (1 or 2)", validateCollectorChoice))
 	}
 	return "nr-k8s"
 }
