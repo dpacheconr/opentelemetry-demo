@@ -60,6 +60,7 @@ func handleK8s(action string, cfg *Config) {
 	if action == "uninstall" {
 		runCommand("helm", []string{"uninstall", Charts["otel-demo"].Name, "-n", ns}, nil)
 		runCommand("helm", []string{"uninstall", Charts["nr-k8s"].Name, "-n", ns}, nil)
+		runCommand("helm", []string{"uninstall", Charts["kube-stack"].Name, "-n", ns}, nil)
 		runCommand("kubectl", []string{"delete", "ns", ns}, nil)
 		return
 	}
@@ -86,15 +87,41 @@ func handleK8s(action string, cfg *Config) {
 	exec.Command("kubectl", "create", "ns", ns).Run()
 
 	exec.Command("kubectl", "delete", "secret", "newrelic-license-key", "-n", ns).Run()
-	runCommand("kubectl", []string{"create", "secret", "generic", "newrelic-license-key", "--from-literal=license-key=" + cfg.LicenseKey, "-n", ns}, nil)
+	runCommand("kubectl", []string{"create", "secret", "generic", "newrelic-license-key", "--from-literal=license-key=" + cfg.LicenseKey, "--from-literal=otlp-endpoint=" + otlpEndpointForRegion(cfg.Region), "-n", ns}, nil)
 
-	installChart("nr-k8s", []string{Paths["nr-k8s-values"]}, "global.region="+strings.ToLower(cfg.Region))
-
-	otelValues := []string{Paths["otel-values"]}
-	if cfg.EnableBrowser != nil && *cfg.EnableBrowser {
-		otelValues = append(otelValues, Paths["otel-browser-values"])
+	k8sCollector := os.Getenv("K8S_COLLECTOR")
+	if k8sCollector == "" {
+		k8sCollector = "nr-k8s"
 	}
-	installChart("otel-demo", otelValues)
+
+	if k8sCollector == "kube-stack" {
+		installChart("kube-stack", []string{Paths["kube-stack-values"]}, "clusterName="+OtelDemoNamespace, "opentelemetry-operator.admissionWebhooks.certManager.enabled=false", "opentelemetry-operator.admissionWebhooks.autoGenerateCert.enabled=true")
+
+		otelValues := []string{Paths["otel-values"], Paths["kube-stack-overlay"]}
+		if cfg.EnableBrowser != nil && *cfg.EnableBrowser {
+			otelValues = append(otelValues, Paths["otel-browser-values"])
+		}
+		installChart("otel-demo", otelValues)
+	} else {
+		installChart("nr-k8s", []string{Paths["nr-k8s-values"]}, "global.region="+strings.ToLower(cfg.Region))
+
+		otelValues := []string{Paths["otel-values"]}
+		if cfg.EnableBrowser != nil && *cfg.EnableBrowser {
+			otelValues = append(otelValues, Paths["otel-browser-values"])
+		}
+		installChart("otel-demo", otelValues)
+	}
+}
+
+// otlpEndpointForRegion returns the New Relic OTLP endpoint for a region.
+func otlpEndpointForRegion(region string) string {
+	switch strings.ToLower(region) {
+	case "eu":
+		return "https://otlp.eu01.nr-data.net"
+	case "jp":
+		return "https://otlp.jp.nr-data.net"
+	}
+	return "https://otlp.nr-data.net"
 }
 
 // installChart executes the helm upgrade --install command for a given chart.

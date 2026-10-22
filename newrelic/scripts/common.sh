@@ -11,8 +11,10 @@ TS_FULL=$(date +"%Y-%m-%d %H:%M:%S")
 # Kubernetes variables
 OTEL_DEMO_CHART_VERSION="0.42.4"
 NR_K8S_CHART_VERSION="0.14.4"
+KUBE_STACK_CHART_VERSION="0.25.1"
 OTEL_DEMO_RELEASE_NAME=otel-demo
 NR_K8S_RELEASE_NAME=nr-k8s-otel-collector
+KUBE_STACK_RELEASE_NAME=kube-stack
 OTEL_DEMO_NAMESPACE=opentelemetry-demo
 NR_LICENSE_SECRET=newrelic-license-key
 # Postgres user (created by the demo's init.sql) that the NR collector's
@@ -23,8 +25,11 @@ OTEL_DEMO_VALUES_PATH=${OTEL_DEMO_VALUES_PATH:-"$SCRIPT_DIR/../k8s/helm/opentele
 OTEL_DEMO_RENDER_PATH=${OTEL_DEMO_RENDER_PATH:-"$SCRIPT_DIR/../k8s/rendered/opentelemetry-demo.yaml"}
 NR_K8S_VALUES_PATH=${NR_K8S_VALUES_PATH:-"$SCRIPT_DIR/../k8s/helm/nr-k8s-otel-collector.yaml"}
 NR_K8S_RENDER_PATH=${NR_K8S_RENDER_PATH:-"$SCRIPT_DIR/../k8s/rendered/nr-k8s-otel-collector.yaml"}
+KUBE_STACK_VALUES_PATH=${KUBE_STACK_VALUES_PATH:-"$SCRIPT_DIR/../k8s/helm/kube-stack.yaml"}
+KUBE_STACK_RENDER_PATH=${KUBE_STACK_RENDER_PATH:-"$SCRIPT_DIR/../k8s/rendered/kube-stack.yaml"}
 CONFIG_GO_PATH=${CONFIG_GO_PATH:-"$SCRIPT_DIR/../cli/config.go"}
 CHART_VERSIONS_PATH=${CHART_VERSIONS_PATH:-"$SCRIPT_DIR/../k8s/chart-versions.yaml"}
+K8S_COLLECTOR=${K8S_COLLECTOR:-"nr-k8s"}
 
 # Docker variables
 # Upstream v3.0.0 split the old monolithic docker-compose.yml into these layered
@@ -169,6 +174,14 @@ prompt_for_openshift() {
     export IS_OPENSHIFT_CLUSTER="n"
   fi
   validate_yesno_answer "IS_OPENSHIFT_CLUSTER"
+}
+
+otlp_endpoint_for_region() {
+  case "$1" in
+    eu) echo "https://otlp.eu01.nr-data.net" ;;
+    jp) echo "https://otlp.jp.nr-data.net" ;;
+    *) echo "https://otlp.nr-data.net" ;;
+  esac
 }
 
 function sed_i() {

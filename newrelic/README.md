@@ -14,6 +14,7 @@ This repository contains a fork of the OpenTelemetry Astronomy Shop, a microserv
 - [Setup](#setup)
 - [Installation Options](#installation-options)
   - [Kubernetes Installation](#kubernetes-installation)
+  - [Alternative: opentelemetry-kube-stack](#alternative-opentelemetry-kube-stack)
   - [Docker Installation](#docker-installation)
   - [Terraform Automation (Optional)](#terraform-automation-optional)
 - [Validating the Install](#validating-the-install)
@@ -135,6 +136,57 @@ release "otel-demo" uninstalled
 Successfully uninstalled 'otel-demo'
 Namespace 'opentelemetry-demo' found. Deleting...
 namespace "opentelemetry-demo" deleted
+```
+
+## Alternative: opentelemetry-kube-stack
+
+The [OpenTelemetry Kube Stack](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack) is an alternative Kubernetes collector that provides OpenTelemetry semantic conventions for Kubernetes observability. Use it instead of the default New Relic K8s collector by setting the `K8S_COLLECTOR` environment variable:
+
+```bash
+export NEW_RELIC_LICENSE_KEY="your-license-key"
+export K8S_COLLECTOR="kube-stack"
+./install-k8s.sh
+```
+
+The license key is read from the existing `newrelic-license-key` secret and set via `--set managers[0].apiKey`.
+
+### Prerequisites for Kube Stack
+
+**EKS (AWS)**: If running on EKS with IMDSv2, ensure your node group has an HTTP PUT response hop limit of **2** or higher. This allows pods to reach the IMDS endpoint for cloud resource detection:
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id <instance-id> \
+  --http-put-response-hop-limit 2
+```
+
+Without this, the collector will not have `cloud.provider`, `cloud.resource_id`, and other cloud resource attributes. The cluster name will still be detected from the `clusterName` value.
+
+**Certificate Manager**: `kube-stack.yaml` sets `autoGenerateCert.enabled: true` and `certManager.enabled: false`, so cert-manager should not be required. Depending on the chart version, the install can still fail with `no matches for kind "Certificate" in version "cert-manager.io/v1"`. If that happens, pass `--set opentelemetry-operator.admissionWebhooks.certManager.enabled=false --set opentelemetry-operator.admissionWebhooks.autoGenerateCert.enabled=true`, or install cert-manager (`helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true`).
+
+### Known Limitations
+
+Compared to the nr-k8s collector:
+
+- **No low data mode equivalent** (as of the current kube-stack version)
+- **Cumulative-to-delta converter** unbounded state may grow over time; consider setting `cumulativetodelta.max_staleness` appropriately
+- **cAdvisor duplicates** may occur in Kubernetes metrics
+
+### Verification
+
+When using kube-stack, verify:
+
+- ✅ Pods in the `opentelemetry-demo` namespace are Running and Ready
+- ✅ Collector pods in the same namespace are Running (daemonset, gateway, and cluster-stats collectors)
+- ✅ Demo service traces and metrics arrive in New Relic (use `./validate-newrelic.sh`)
+- ✅ Kubernetes metrics with `k8s.*` semantic conventions are visible (e.g., `k8s.node.condition.status`, `k8s.pod.status.phase`)
+- ⚠️ **Not verified**: Full compatibility with all demo features, real-time cost savings vs. nr-k8s
+
+To validate after installation:
+
+```bash
+export K8S_COLLECTOR="kube-stack"
+./validate-k8s.sh
 ```
 
 ## Docker Installation

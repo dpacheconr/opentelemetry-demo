@@ -9,10 +9,11 @@ import (
 
 const (
 	// NOTE: keep these in sync with newrelic/scripts/common.sh
-	// (OTEL_DEMO_CHART_VERSION / NR_K8S_CHART_VERSION). Tracked for de-duplication.
-	OtelDemoChartVersion = "0.42.4"
-	NrK8sChartVersion    = "0.14.4"
-	OtelDemoNamespace    = "opentelemetry-demo"
+	// (OTEL_DEMO_CHART_VERSION / NR_K8S_CHART_VERSION / KUBE_STACK_CHART_VERSION). Tracked for de-duplication.
+	OtelDemoChartVersion  = "0.42.4"
+	NrK8sChartVersion     = "0.14.4"
+	KubeStackChartVersion = "0.25.1"
+	OtelDemoNamespace     = "opentelemetry-demo"
 )
 
 var (
@@ -26,6 +27,8 @@ var (
 		"otel-values":         filepath.Join("..", "k8s", "helm", "opentelemetry-demo.yaml"),
 		"otel-browser-values": filepath.Join("..", "k8s", "helm", "nr-browser.yaml"),
 		"nr-k8s-values":       filepath.Join("..", "k8s", "helm", "nr-k8s-otel-collector.yaml"),
+		"kube-stack-values":   filepath.Join("..", "k8s", "helm", "kube-stack.yaml"),
+		"kube-stack-overlay":  filepath.Join("..", "k8s", "helm", "opentelemetry-demo-kube-stack.yaml"),
 		"docker-compose":      filepath.Join("..", "docker", "docker-compose.yml"),
 		"docker-patch":        filepath.Join("..", "docker", "config", "monkey-patch.js"),
 		"tf-account":          filepath.Join("..", "terraform", "nr_account"),
@@ -34,8 +37,9 @@ var (
 	}
 
 	Charts = map[string]struct{ Name, Repo, Version, NS string }{
-		"nr-k8s":    {"nr-k8s-otel-collector", "newrelic/nr-k8s-otel-collector", NrK8sChartVersion, OtelDemoNamespace},
-		"otel-demo": {"otel-demo", "open-telemetry/opentelemetry-demo", OtelDemoChartVersion, OtelDemoNamespace},
+		"nr-k8s":     {"nr-k8s-otel-collector", "newrelic/nr-k8s-otel-collector", NrK8sChartVersion, OtelDemoNamespace},
+		"otel-demo":  {"otel-demo", "open-telemetry/opentelemetry-demo", OtelDemoChartVersion, OtelDemoNamespace},
+		"kube-stack": {"kube-stack", "open-telemetry/opentelemetry-kube-stack", KubeStackChartVersion, OtelDemoNamespace},
 	}
 )
 
