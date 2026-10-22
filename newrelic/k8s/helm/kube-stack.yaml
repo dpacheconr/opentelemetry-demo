@@ -2,6 +2,13 @@ clusterName: opentelemetry-demo
 kubeStateMetrics:
   enabled: true
 kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 50Mi
+    limits:
+      cpu: 100m
+      memory: 100Mi
   prometheus:
     monitor:
       enabled: false
@@ -16,6 +23,13 @@ kube-state-metrics:
 collectors:
   daemon:
     scrape_configs_file: ""
+    resources:
+      requests:
+        cpu: 50m
+        memory: 200Mi
+      limits:
+        cpu: 500m
+        memory: 400Mi
     env:
       - name: NR_LICENSE_KEY
         valueFrom:
@@ -1053,6 +1067,13 @@ extraObjects:
     spec:
       mode: deployment
       replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 250Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
       serviceAccount: kube-stack-gateway
       env:
         - name: NR_LICENSE_KEY
@@ -1481,6 +1502,13 @@ extraObjects:
     spec:
       mode: deployment
       replicas: 1
+      resources:
+        requests:
+          cpu: 50m
+          memory: 250Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
       serviceAccount: kube-stack-cluster-stats
       env:
         - name: NR_LICENSE_KEY
@@ -2296,6 +2324,14 @@ extraObjects:
               exporters:
                 - otlp_http/newrelic
 opentelemetry-operator:
+  manager:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
   admissionWebhooks:
     autoGenerateCert:
       enabled: true
