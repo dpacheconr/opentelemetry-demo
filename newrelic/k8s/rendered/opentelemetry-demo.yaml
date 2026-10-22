@@ -2138,10 +2138,10 @@ spec:
                 k8s.pod.uid=$(OTEL_POD_UID), k8s.namespace.name=$(OTEL_NAMESPACE_NAME), k8s.cluster.name=$(OTEL_CLUSTER_NAME),service.criticality=low
           resources:
             limits:
-              cpu: 500m
+              cpu: 1000m
               memory: 500Mi
             requests:
-              cpu: 20m
+              cpu: 30m
               memory: 200Mi
           volumeMounts:
             - mountPath: /app/fixtures/vcr_cassettes
@@ -2479,10 +2479,10 @@ spec:
                 k8s.pod.uid=$(OTEL_POD_UID), k8s.namespace.name=$(OTEL_NAMESPACE_NAME), k8s.cluster.name=$(OTEL_CLUSTER_NAME),service.criticality=low
           resources:
             limits:
-              cpu: 500m
+              cpu: 1000m
               memory: 500Mi
             requests:
-              cpu: 50m
+              cpu: 75m
               memory: 140Mi
           volumeMounts:
       volumes:
@@ -2711,10 +2711,10 @@ spec:
           resources:
             limits:
               cpu: 200m
-              memory: 20Mi
+              memory: 40Mi
             requests:
               cpu: 10m
-              memory: 10Mi
+              memory: 15Mi
           volumeMounts:
       volumes:
 
@@ -3388,7 +3388,7 @@ spec:
               cpu: 300m
               memory: 90Mi
             requests:
-              cpu: 20m
+              cpu: 25m
               memory: 40Mi
           securityContext:
             runAsGroup: 101
@@ -3598,10 +3598,10 @@ spec:
           resources:
             limits:
               cpu: 1000m
-              memory: 700Mi
+              memory: 900Mi
             requests:
               cpu: 50m
-              memory: 570Mi
+              memory: 650Mi
           securityContext:
             runAsGroup: 1000
             runAsNonRoot: true
@@ -3728,7 +3728,7 @@ spec:
               cpu: 1000m
               memory: 1500Mi
             requests:
-              cpu: 300m
+              cpu: 600m
               memory: 560Mi
           volumeMounts:
       volumes:
@@ -3994,7 +3994,7 @@ spec:
               memory: 140Mi
             requests:
               cpu: 10m
-              memory: 60Mi
+              memory: 80Mi
           securityContext:
             runAsGroup: 1000
             runAsNonRoot: true
@@ -4227,10 +4227,10 @@ spec:
           resources:
             limits:
               cpu: 200m
-              memory: 40Mi
+              memory: 64Mi
             requests:
               cpu: 10m
-              memory: 20Mi
+              memory: 28Mi
           securityContext:
             runAsGroup: 33
             runAsNonRoot: true
@@ -4336,10 +4336,10 @@ spec:
                 k8s.pod.uid=$(OTEL_POD_UID), k8s.namespace.name=$(OTEL_NAMESPACE_NAME), k8s.cluster.name=$(OTEL_CLUSTER_NAME),service.criticality=medium
           resources:
             limits:
-              cpu: 300m
+              cpu: 500m
               memory: 500Mi
             requests:
-              cpu: 20m
+              cpu: 60m
               memory: 50Mi
           volumeMounts:
       volumes:
@@ -4441,7 +4441,7 @@ spec:
           resources:
             limits:
               cpu: 200m
-              memory: 20Mi
+              memory: 40Mi
             requests:
               cpu: 10m
               memory: 10Mi
@@ -4615,7 +4615,7 @@ spec:
           resources:
             limits:
               cpu: 100m
-              memory: 20Mi
+              memory: 40Mi
             requests:
               cpu: 10m
               memory: 15Mi

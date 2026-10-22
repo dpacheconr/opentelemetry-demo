@@ -71,9 +71,10 @@ components:
     resources:
       requests:
         cpu: 50m
-        memory: 570Mi
+        memory: 650Mi
       limits:
         cpu: 1000m
+        memory: 900Mi
   cart:
     envOverrides:
       - name: VALKEY_ADDR
@@ -106,10 +107,10 @@ components:
         value: product-catalog.{{ .Release.Namespace }}.svc.cluster.local:8080
     resources:
       requests:
-        cpu: 20m
+        cpu: 60m
         memory: 50Mi
       limits:
-        cpu: 300m
+        cpu: 500m
   product-catalog:
     resources:
       limits:
@@ -134,10 +135,10 @@ components:
         value: "True"
     resources:
       requests:
-        cpu: 20m
+        cpu: 30m
         memory: 200Mi
       limits:
-        cpu: 500m
+        cpu: 1000m
   astronomy-db:
     # Preload pg_stat_statements so the NR collector's postgresql receiver can
     # read db.server.top_query; must be set at server start (not via CREATE
@@ -220,7 +221,7 @@ components:
         value: http://$(OTEL_COLLECTOR_NAME):4317
     resources:
       requests:
-        cpu: 300m
+        cpu: 600m
         memory: 560Mi
       limits:
         cpu: 1000m
@@ -234,17 +235,18 @@ components:
   chatbot:
     resources:
       requests:
-        cpu: 50m
+        cpu: 75m
         memory: 140Mi
       limits:
-        cpu: 500m
+        cpu: 1000m
   currency:
     resources:
       requests:
         cpu: 10m
-        memory: 10Mi
+        memory: 15Mi
       limits:
         cpu: 200m
+        memory: 40Mi
   fraud-detection:
     resources:
       requests:
@@ -262,7 +264,7 @@ components:
   frontend-proxy:
     resources:
       requests:
-        cpu: 20m
+        cpu: 25m
         memory: 40Mi
       limits:
         cpu: 300m
@@ -291,16 +293,17 @@ components:
     resources:
       requests:
         cpu: 10m
-        memory: 60Mi
+        memory: 80Mi
       limits:
         cpu: 200m
   quote:
     resources:
       requests:
         cpu: 10m
-        memory: 20Mi
+        memory: 28Mi
       limits:
         cpu: 200m
+        memory: 64Mi
   shipping:
     resources:
       requests:
@@ -308,6 +311,7 @@ components:
         memory: 10Mi
       limits:
         cpu: 200m
+        memory: 40Mi
   telemetry-docs:
     resources:
       requests:
@@ -322,6 +326,7 @@ components:
         memory: 15Mi
       limits:
         cpu: 100m
+        memory: 40Mi
   flagd:
     sidecarContainers:
       - name: flagd-ui
