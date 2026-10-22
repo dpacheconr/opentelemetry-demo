@@ -9,10 +9,11 @@ import (
 
 const (
 	// NOTE: keep these in sync with newrelic/scripts/common.sh
-	// (OTEL_DEMO_CHART_VERSION / NR_K8S_CHART_VERSION). Tracked for de-duplication.
-	OtelDemoChartVersion = "0.42.4"
-	NrK8sChartVersion    = "0.14.4"
-	OtelDemoNamespace    = "opentelemetry-demo"
+	// (OTEL_DEMO_CHART_VERSION / NR_K8S_CHART_VERSION / KUBE_STACK_CHART_VERSION). Tracked for de-duplication.
+	OtelDemoChartVersion  = "0.42.4"
+	NrK8sChartVersion     = "0.14.4"
+	KubeStackChartVersion = "0.25.1"
+	OtelDemoNamespace     = "opentelemetry-demo"
 )
 
 var (
@@ -26,6 +27,8 @@ var (
 		"otel-values":         filepath.Join("..", "k8s", "helm", "opentelemetry-demo.yaml"),
 		"otel-browser-values": filepath.Join("..", "k8s", "helm", "nr-browser.yaml"),
 		"nr-k8s-values":       filepath.Join("..", "k8s", "helm", "nr-k8s-otel-collector.yaml"),
+		"kube-stack-values":   filepath.Join("..", "k8s", "helm", "kube-stack.yaml"),
+		"kube-stack-overlay":  filepath.Join("..", "k8s", "helm", "opentelemetry-demo-kube-stack.yaml"),
 		"docker-compose":      filepath.Join("..", "docker", "docker-compose.yml"),
 		"docker-patch":        filepath.Join("..", "docker", "config", "monkey-patch.js"),
 		"tf-account":          filepath.Join("..", "terraform", "nr_account"),
@@ -34,13 +37,14 @@ var (
 	}
 
 	Charts = map[string]struct{ Name, Repo, Version, NS string }{
-		"nr-k8s":    {"nr-k8s-otel-collector", "newrelic/nr-k8s-otel-collector", NrK8sChartVersion, OtelDemoNamespace},
-		"otel-demo": {"otel-demo", "open-telemetry/opentelemetry-demo", OtelDemoChartVersion, OtelDemoNamespace},
+		"nr-k8s":     {"nr-k8s-otel-collector", "newrelic/nr-k8s-otel-collector", NrK8sChartVersion, OtelDemoNamespace},
+		"otel-demo":  {"otel-demo", "open-telemetry/opentelemetry-demo", OtelDemoChartVersion, OtelDemoNamespace},
+		"kube-stack": {"kube-stack", "open-telemetry/opentelemetry-kube-stack", KubeStackChartVersion, OtelDemoNamespace},
 	}
 )
 
 type Config struct {
-	LicenseKey, ApiKey, AccountId, Region, Target, Action                              string
+	LicenseKey, ApiKey, AccountId, Region, Target, Action, K8sCollector                string
 	EnableBrowser                                                                      *bool
 	SubAccountId                                                                       string
 	ParentAccountId                                                                    string
@@ -151,6 +155,22 @@ func loadConfig(cfg *Config) {
 		fmt.Println("\n>>> Browser Monitoring configuration missing.")
 		enable := promptBool("Do you want to enable Digital Experience Monitoring (Browser)?")
 		cfg.EnableBrowser = &enable
+	}
+
+	// 5. K8s collector choice (asked once if K8S_COLLECTOR is unset)
+	if cfg.Target == "k8s" {
+		if cfg.K8sCollector == "" {
+			cfg.K8sCollector = os.Getenv("K8S_COLLECTOR")
+		}
+		if cfg.K8sCollector == "" {
+			fmt.Println("\n>>> Kubernetes collector not selected.")
+			fmt.Println("  1. nr-k8s-otel-collector (New Relic chart, default)")
+			fmt.Println("  2. opentelemetry-kube-stack (OpenTelemetry chart)")
+			cfg.K8sCollector = promptUser("Choose a collector (1 or 2)", validateCollectorChoice)
+		}
+		cfg.K8sCollector = normalizeCollector(cfg.K8sCollector)
+		os.Setenv("K8S_COLLECTOR", cfg.K8sCollector)
+		upsertEnvVar("K8S_COLLECTOR", cfg.K8sCollector)
 	}
 
 	// Standard prompts for K8s/Docker

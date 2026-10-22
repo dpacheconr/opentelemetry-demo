@@ -74,14 +74,23 @@ else
 fi
 
 # Create or update New Relic license secret
-kubectl create secret generic "$NR_LICENSE_SECRET" --from-literal=license-key="$NEW_RELIC_LICENSE_KEY" -n "$OTEL_DEMO_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic "$NR_LICENSE_SECRET" --from-literal=license-key="$NEW_RELIC_LICENSE_KEY" --from-literal=otlp-endpoint="$(otlp_endpoint_for_region "$NEW_RELIC_REGION")" -n "$OTEL_DEMO_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-# Install New Relic K8s OpenTelemetry Collector
-ensure_helm_repo "newrelic" "https://helm-charts.newrelic.com"
-install_or_upgrade_chart "$NR_K8S_RELEASE_NAME" "newrelic/nr-k8s-otel-collector" "$NR_K8S_CHART_VERSION" "../k8s/helm/nr-k8s-otel-collector.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER" "global.region=$NEW_RELIC_REGION"
-
-# Install OpenTelemetry Demo
+# Install collectors based on K8S_COLLECTOR env var
 ensure_helm_repo "open-telemetry" "https://open-telemetry.github.io/opentelemetry-helm-charts"
-install_or_upgrade_chart "$OTEL_DEMO_RELEASE_NAME" "open-telemetry/opentelemetry-demo" "$OTEL_DEMO_CHART_VERSION" "../k8s/helm/opentelemetry-demo.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER"
+
+if [ "$K8S_COLLECTOR" = "kube-stack" ]; then
+  # Install opentelemetry-kube-stack
+  install_or_upgrade_chart "$KUBE_STACK_RELEASE_NAME" "open-telemetry/opentelemetry-kube-stack" "$KUBE_STACK_CHART_VERSION" "../k8s/helm/kube-stack.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER" "clusterName=$OTEL_DEMO_NAMESPACE" "opentelemetry-operator.admissionWebhooks.certManager.enabled=false" "opentelemetry-operator.admissionWebhooks.autoGenerateCert.enabled=true"
+
+  install_or_upgrade_chart "$OTEL_DEMO_RELEASE_NAME" "open-telemetry/opentelemetry-demo" "$OTEL_DEMO_CHART_VERSION" "../k8s/helm/opentelemetry-demo.yaml,../k8s/helm/opentelemetry-demo-kube-stack.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER"
+else
+  # Default: Install New Relic K8s OpenTelemetry Collector
+  ensure_helm_repo "newrelic" "https://helm-charts.newrelic.com"
+  install_or_upgrade_chart "$NR_K8S_RELEASE_NAME" "newrelic/nr-k8s-otel-collector" "$NR_K8S_CHART_VERSION" "../k8s/helm/nr-k8s-otel-collector.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER" "global.region=$NEW_RELIC_REGION"
+
+  # Install OpenTelemetry Demo
+  install_or_upgrade_chart "$OTEL_DEMO_RELEASE_NAME" "open-telemetry/opentelemetry-demo" "$OTEL_DEMO_CHART_VERSION" "../k8s/helm/opentelemetry-demo.yaml" "$OTEL_DEMO_NAMESPACE" "$IS_OPENSHIFT_CLUSTER"
+fi
 
 echo "OpenTelemetry Demo installation completed successfully!"

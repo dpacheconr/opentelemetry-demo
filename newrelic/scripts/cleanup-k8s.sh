@@ -41,6 +41,7 @@ cleanup_namespace() {
 
 cleanup_helm_release "$OTEL_DEMO_RELEASE_NAME" "$OTEL_DEMO_NAMESPACE"
 cleanup_helm_release "$NR_K8S_RELEASE_NAME" "$OTEL_DEMO_NAMESPACE"
+cleanup_helm_release "$KUBE_STACK_RELEASE_NAME" "$OTEL_DEMO_NAMESPACE"
 cleanup_namespace "$OTEL_DEMO_NAMESPACE"
 
 echo "Cleanup completed successfully."

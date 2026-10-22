@@ -56,10 +56,11 @@ template_chart() {
 }
 
 write_chart_versions_yaml() {
-  local otel_demo nr_k8s
+  local otel_demo nr_k8s kube_stack
   otel_demo=$(sed -n 's/^OTEL_DEMO_CHART_VERSION="\(.*\)"$/\1/p' "$COMMON_SCRIPT_PATH")
   nr_k8s=$(sed -n 's/^NR_K8S_CHART_VERSION="\(.*\)"$/\1/p' "$COMMON_SCRIPT_PATH")
-  printf 'otelDemoChartVersion: "%s"\nnrK8sChartVersion: "%s"\n' "$otel_demo" "$nr_k8s" > "$CHART_VERSIONS_PATH"
+  kube_stack=$(sed -n 's/^KUBE_STACK_CHART_VERSION="\(.*\)"$/\1/p' "$COMMON_SCRIPT_PATH")
+  printf 'otelDemoChartVersion: "%s"\nnrK8sChartVersion: "%s"\nkubeStackChartVersion: "%s"\n' "$otel_demo" "$nr_k8s" "$kube_stack" > "$CHART_VERSIONS_PATH"
 }
 
 update_version_in_script() {
@@ -93,6 +94,7 @@ ensure_helm_repo "open-telemetry" "https://open-telemetry.github.io/opentelemetr
 
 check_file_exists "$OTEL_DEMO_VALUES_PATH"
 check_file_exists "$NR_K8S_VALUES_PATH"
+check_file_exists "$KUBE_STACK_VALUES_PATH"
 
 LATEST_OTEL_DEMO_CHART_VERSION=$(helm search repo open-telemetry/opentelemetry-demo --versions | awk 'NR==2 {print $2}')
 if [[ -z "$LATEST_OTEL_DEMO_CHART_VERSION" ]]; then
@@ -140,6 +142,12 @@ if [ "$CONTRIB_VERSION" != "$CURR_CONTRIB_VERSION" ]; then
   # (rather than `yq -i`) keeps the diff surgical and preserves the file's comments
   # and formatting.
   sed_i '/repository: otel\/opentelemetry-collector-contrib/{n;s/tag: .*/tag: "'"$CONTRIB_VERSION"'"/;}' "$NR_K8S_VALUES_PATH"
+  # Sync kube-stack collector contrib image tag if it uses contrib
+  if grep -q "opentelemetry-collector-contrib" "$KUBE_STACK_VALUES_PATH" 2>/dev/null; then
+    sed_i '/repository: otel\/opentelemetry-collector-contrib/{n;s/tag: .*/tag: "'"$CONTRIB_VERSION"'"/;}' "$KUBE_STACK_VALUES_PATH"
+    sed_i "s#\(image: otel/opentelemetry-collector-contrib:\).*#\1$CONTRIB_VERSION#" "$KUBE_STACK_VALUES_PATH"
+    echo "Updated opentelemetry-collector-contrib tag in $KUBE_STACK_VALUES_PATH"
+  fi
   sed_i "s#\(image: .*opentelemetry-collector-contrib:\).*#\1$CONTRIB_VERSION#" "$NR_DOCKER_COMPOSE_PATH"
   echo "Updated images.collector.tag in $NR_K8S_VALUES_PATH and otel-collector image in $NR_DOCKER_COMPOSE_PATH"
   CONTRIB_UPDATED=true
@@ -164,6 +172,23 @@ else
   echo "NR K8s chart is up to date."
 fi
 
+LATEST_KUBE_STACK_CHART_VERSION=$(helm search repo open-telemetry/opentelemetry-kube-stack --versions | awk 'NR==2 {print $2}')
+CURR_KUBE_STACK_CHART_VERSION=$(cat $COMMON_SCRIPT_PATH | sed -n 's/^KUBE_STACK_CHART_VERSION="\([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)"$/\1/p')
+
+echo "Latest OpenTelemetry Kube Stack chart version: $LATEST_KUBE_STACK_CHART_VERSION"
+echo "Current OpenTelemetry Kube Stack chart version: $CURR_KUBE_STACK_CHART_VERSION"
+
+KUBE_STACK_UPDATED=false
+
+if [ "$LATEST_KUBE_STACK_CHART_VERSION" != "" ] && [ "$LATEST_KUBE_STACK_CHART_VERSION" != "$CURR_KUBE_STACK_CHART_VERSION" ]; then
+  echo "Updating opentelemetry-kube-stack chart to version $LATEST_KUBE_STACK_CHART_VERSION"
+  update_version_in_script "KUBE_STACK_CHART_VERSION" "$LATEST_KUBE_STACK_CHART_VERSION" "$COMMON_SCRIPT_PATH"
+  update_go_const "KubeStackChartVersion" "$LATEST_KUBE_STACK_CHART_VERSION" "$CONFIG_GO_PATH"
+  KUBE_STACK_UPDATED=true
+else
+  echo "OpenTelemetry Kube Stack chart is up to date."
+fi
+
 write_chart_versions_yaml
 
 # Re-render the NR K8s manifest when the chart version changed OR the contrib tag changed.
@@ -176,7 +201,15 @@ if [ "$NR_K8S_UPDATED" = true ] || [ "$CONTRIB_UPDATED" = true ]; then
   echo "Completed updating the New Relic K8s instrumentation!"
 fi
 
-if [ "$OTEL_DEMO_UPDATED" = false ] && [ "$NR_K8S_UPDATED" = false ] && [ "$CONTRIB_UPDATED" = false ]; then
+# Re-render the kube-stack manifest when the chart version changed OR the contrib tag changed.
+if [ "$KUBE_STACK_UPDATED" = true ] || [ "$CONTRIB_UPDATED" = true ]; then
+  KUBE_STACK_RENDER_VERSION="${LATEST_KUBE_STACK_CHART_VERSION:-$CURR_KUBE_STACK_CHART_VERSION}"
+  echo "Rendering opentelemetry-kube-stack chart (version $KUBE_STACK_RENDER_VERSION)"
+  template_chart "kube-stack" "open-telemetry/opentelemetry-kube-stack" "$KUBE_STACK_RENDER_VERSION" "opentelemetry-demo" "$KUBE_STACK_VALUES_PATH" "$KUBE_STACK_RENDER_PATH"
+  echo "Completed updating the OpenTelemetry Kube Stack chart!"
+fi
+
+if [ "$OTEL_DEMO_UPDATED" = false ] && [ "$NR_K8S_UPDATED" = false ] && [ "$KUBE_STACK_UPDATED" = false ] && [ "$CONTRIB_UPDATED" = false ]; then
   echo "No updates were necessary. Charts are up to date."
   exit 0
 fi
@@ -198,6 +231,14 @@ if [ "$NR_K8S_UPDATED" = true ]; then
   fi
   COMMIT_DESC+="nr-k8s $LATEST_NR_K8S_CHART_VERSION"
   BODY_DESC+="* nr-k8s-otel-collector-$LATEST_NR_K8S_CHART_VERSION"$'\n'
+fi
+
+if [ "$KUBE_STACK_UPDATED" = true ]; then
+  if [ -n "$COMMIT_DESC" ]; then
+    COMMIT_DESC+=","
+  fi
+  COMMIT_DESC+="kube-stack $LATEST_KUBE_STACK_CHART_VERSION"
+  BODY_DESC+="* opentelemetry-kube-stack-$LATEST_KUBE_STACK_CHART_VERSION"$'\n'
 fi
 
 if [ "$CONTRIB_UPDATED" = true ]; then

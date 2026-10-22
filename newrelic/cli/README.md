@@ -98,6 +98,19 @@ All flags can be passed as command-line arguments (e.g., `--NEW_RELIC_REGION=EU`
 
 * `--NEW_RELIC_LICENSE_KEY`: Your New Relic License Key (must end in `NRAL`).
 
+### Kubernetes Collector (Target: `k8s`)
+
+* `K8S_COLLECTOR`: Environment variable (not a flag), also read from `.env`. Selects the collector chart: `nr-k8s` (`newrelic/nr-k8s-otel-collector`) or `kube-stack` (`open-telemetry/opentelemetry-kube-stack`). If it is not set, the CLI asks which collector to deploy and saves the answer to `.env`. Uninstall does not ask.
+
+The license key and the OTLP endpoint for the selected region are stored in the `newrelic-license-key` secret in the `opentelemetry-demo` namespace, and the collectors read them from there. The banner at the top of the CLI shows the collector, demo chart and versions that will be deployed.
+
+```bash
+K8S_COLLECTOR=kube-stack ./nr-otel-cli install k8s
+K8S_COLLECTOR=kube-stack ./nr-otel-cli uninstall k8s
+```
+
+See the [kube-stack section](../README.md#alternative-opentelemetry-kube-stack) of the main README for prerequisites and known gaps.
+
 ### Terraform Account Flags (Target: `account`)
 
 * `--NEW_RELIC_API_KEY`: New Relic User API Key (starts with `NRAK-`).
