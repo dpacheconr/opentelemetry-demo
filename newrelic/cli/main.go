@@ -258,6 +258,9 @@ GLOBAL FLAGS:
 INSTALL FLAGS:
   --NEW_RELIC_LICENSE_KEY     - New Relic License Key (ends in NRAL; K8s/Docker only)
 
+K8S ENVIRONMENT VARIABLES:
+  K8S_COLLECTOR               - Collector chart for the 'k8s' target: "nr-k8s" (Default) or "kube-stack"
+
 TERRAFORM RESOURCES FLAGS (Required for 'resources' target):
   --NEW_RELIC_API_KEY           - New Relic User API Key (starts with NRAK-)
 
@@ -296,6 +299,16 @@ func printCurrentState(cfg *Config) {
 	fmt.Printf("  %sLicense:%s    %s\n", ColorCyan, ColorReset, maskString(cfg.LicenseKey))
 	fmt.Printf("  %sAPI Key:%s    %s\n", ColorCyan, ColorReset, maskString(cfg.ApiKey))
 	fmt.Printf("  %sBrowser:%s    %s\n", ColorCyan, ColorReset, browserStatus)
+	if cfg.Target == "" || cfg.Target == "k8s" {
+		collector := Charts["nr-k8s"]
+		if k8sCollector() == "kube-stack" {
+			collector = Charts["kube-stack"]
+		}
+		demo := Charts["otel-demo"]
+		fmt.Printf("  %sCollector:%s  %s (%s %s)\n", ColorCyan, ColorReset, collector.Name, collector.Repo, collector.Version)
+		fmt.Printf("  %sDemo:%s       %s (%s %s)\n", ColorCyan, ColorReset, demo.Name, demo.Repo, demo.Version)
+		fmt.Printf("  %sNamespace:%s  %s\n", ColorCyan, ColorReset, demo.NS)
+	}
 	fmt.Println(ColorCyan + "=======================================================" + ColorReset)
 }
 

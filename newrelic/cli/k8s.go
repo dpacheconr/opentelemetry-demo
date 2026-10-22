@@ -89,12 +89,7 @@ func handleK8s(action string, cfg *Config) {
 	exec.Command("kubectl", "delete", "secret", "newrelic-license-key", "-n", ns).Run()
 	runCommand("kubectl", []string{"create", "secret", "generic", "newrelic-license-key", "--from-literal=license-key=" + cfg.LicenseKey, "--from-literal=otlp-endpoint=" + otlpEndpointForRegion(cfg.Region), "-n", ns}, nil)
 
-	k8sCollector := os.Getenv("K8S_COLLECTOR")
-	if k8sCollector == "" {
-		k8sCollector = "nr-k8s"
-	}
-
-	if k8sCollector == "kube-stack" {
+	if k8sCollector() == "kube-stack" {
 		installChart("kube-stack", []string{Paths["kube-stack-values"]}, "clusterName="+OtelDemoNamespace, "opentelemetry-operator.admissionWebhooks.certManager.enabled=false", "opentelemetry-operator.admissionWebhooks.autoGenerateCert.enabled=true")
 
 		otelValues := []string{Paths["otel-values"], Paths["kube-stack-overlay"]}
@@ -111,6 +106,14 @@ func handleK8s(action string, cfg *Config) {
 		}
 		installChart("otel-demo", otelValues)
 	}
+}
+
+// k8sCollector returns the collector chart selected by K8S_COLLECTOR, defaulting to nr-k8s.
+func k8sCollector() string {
+	if c := os.Getenv("K8S_COLLECTOR"); c != "" {
+		return c
+	}
+	return "nr-k8s"
 }
 
 // otlpEndpointForRegion returns the New Relic OTLP endpoint for a region.
