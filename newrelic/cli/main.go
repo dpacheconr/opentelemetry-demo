@@ -259,7 +259,7 @@ INSTALL FLAGS:
   --NEW_RELIC_LICENSE_KEY     - New Relic License Key (ends in NRAL; K8s/Docker only)
 
 K8S ENVIRONMENT VARIABLES:
-  K8S_COLLECTOR               - Collector chart for the 'k8s' target: "nr-k8s" (Default) or "kube-stack"
+  K8S_COLLECTOR               - Collector chart for the 'k8s' target: "nr-k8s" or "kube-stack" (prompted and saved to .env if unset)
 
 TERRAFORM RESOURCES FLAGS (Required for 'resources' target):
   --NEW_RELIC_API_KEY           - New Relic User API Key (starts with NRAK-)

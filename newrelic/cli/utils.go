@@ -116,11 +116,48 @@ func validateUserApiKey(val string) error {
 	return nil
 }
 
+func normalizeCollector(val string) string {
+	switch strings.ToLower(strings.TrimSpace(val)) {
+	case "2", "kube-stack":
+		return "kube-stack"
+	}
+	return "nr-k8s"
+}
+
+func validateCollectorChoice(val string) error {
+	switch strings.ToLower(strings.TrimSpace(val)) {
+	case "1", "2", "nr-k8s", "kube-stack":
+		return nil
+	}
+	return fmt.Errorf("enter 1 (nr-k8s) or 2 (kube-stack)")
+}
+
 func validateNotEmpty(val string) error {
 	if strings.TrimSpace(val) == "" {
 		return fmt.Errorf("value is required")
 	}
 	return nil
+}
+
+// upsertEnvVar sets key in .env, replacing an existing line or appending one,
+// and leaves every other line untouched.
+func upsertEnvVar(key, value string) {
+	var lines []string
+	if data, err := os.ReadFile(".env"); err == nil {
+		lines = strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	}
+	entry := key + "=" + value
+	found := false
+	for i, l := range lines {
+		if strings.HasPrefix(strings.TrimSpace(l), key+"=") {
+			lines[i] = entry
+			found = true
+		}
+	}
+	if !found {
+		lines = append(lines, entry)
+	}
+	os.WriteFile(".env", []byte(strings.Join(lines, "\n")+"\n"), 0644)
 }
 
 func saveConfigToEnv(cfg *Config) {

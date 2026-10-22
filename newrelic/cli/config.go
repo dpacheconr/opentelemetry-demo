@@ -44,7 +44,7 @@ var (
 )
 
 type Config struct {
-	LicenseKey, ApiKey, AccountId, Region, Target, Action                              string
+	LicenseKey, ApiKey, AccountId, Region, Target, Action, K8sCollector                string
 	EnableBrowser                                                                      *bool
 	SubAccountId                                                                       string
 	ParentAccountId                                                                    string
@@ -155,6 +155,22 @@ func loadConfig(cfg *Config) {
 		fmt.Println("\n>>> Browser Monitoring configuration missing.")
 		enable := promptBool("Do you want to enable Digital Experience Monitoring (Browser)?")
 		cfg.EnableBrowser = &enable
+	}
+
+	// 5. K8s collector choice (asked once if K8S_COLLECTOR is unset)
+	if cfg.Target == "k8s" {
+		if cfg.K8sCollector == "" {
+			cfg.K8sCollector = os.Getenv("K8S_COLLECTOR")
+		}
+		if cfg.K8sCollector == "" {
+			fmt.Println("\n>>> Kubernetes collector not selected.")
+			fmt.Println("  1. nr-k8s-otel-collector (New Relic chart, default)")
+			fmt.Println("  2. opentelemetry-kube-stack (OpenTelemetry chart)")
+			cfg.K8sCollector = promptUser("Choose a collector (1 or 2)", validateCollectorChoice)
+		}
+		cfg.K8sCollector = normalizeCollector(cfg.K8sCollector)
+		os.Setenv("K8S_COLLECTOR", cfg.K8sCollector)
+		upsertEnvVar("K8S_COLLECTOR", cfg.K8sCollector)
 	}
 
 	// Standard prompts for K8s/Docker
