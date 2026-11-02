@@ -1235,7 +1235,7 @@ data:
               - ad:9465
       redis:
         collection_interval: 30s
-        endpoint: valkey-cart:6379
+        endpoint: valkey-cart.opentelemetry-demo.svc.cluster.local:6379
 
     processors:
       transform/promote_job_label:
@@ -2805,7 +2805,7 @@ spec:
         app.kubernetes.io/name: nr-k8s-otel-collector
         component: deployment
       annotations:
-        checksum/config: 969744bc0d3c21ddf7b18fd276711273f37700a4bcc5976487491f5d1b004a68
+        checksum/config: 49d421a580d2ec8dd3d8c83df18e52901e93da553b4989a153f02d366862313b
     spec:
       serviceAccountName: nr-k8s-otel-collector
       containers:

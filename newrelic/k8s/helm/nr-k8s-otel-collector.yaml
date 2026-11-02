@@ -138,7 +138,7 @@ deployment:
 
         redis:
           collection_interval: 30s
-          endpoint: valkey-cart:6379
+          endpoint: valkey-cart.opentelemetry-demo.svc.cluster.local:6379
 
         # Demo: scrape a Prometheus /metrics endpoint exposed by the ad
         # service using the Prometheus Java client library, bridging
