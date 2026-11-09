@@ -35,12 +35,12 @@ resource "newrelic_nrql_alert_condition" "web_lcp_threshold" {
   title_template     = local.web_title_template
 }
 
-## INP Threshold
+## Browser Experience Threshold
 resource "newrelic_nrql_alert_condition" "web_inp_threshold" {
   account_id                   = var.newrelic_account_id
   policy_id                    = newrelic_alert_policy.web_alert_policy.id
   type                         = "static"
-  name                         = "INP Threshold"
+  name                         = "Browser Experience Threshold"
   enabled                      = true
   violation_time_limit_seconds = 259200
 
@@ -51,7 +51,7 @@ resource "newrelic_nrql_alert_condition" "web_inp_threshold" {
 
   critical {
     operator              = "above"
-    threshold             = 4.0
+    threshold             = 0.5
     threshold_duration    = local.threshold_duration
     threshold_occurrences = "all"
   }
