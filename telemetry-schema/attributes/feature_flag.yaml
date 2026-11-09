@@ -8,3 +8,9 @@ attributes:
     brief: Whether recommendation caching is enabled
     stability: stable
     note: Indicates whether the recommendation service has caching enabled for this request (feature flag)
+  - key: demo.feature_flag.web_interaction_slowdown
+    type: int
+    brief: Milliseconds the frontend main thread is blocked on Add To Cart
+    stability: stable
+    note: Value of the webInteractionSlowdown feature flag applied to the interaction
+    examples: [250, 500, 1000]

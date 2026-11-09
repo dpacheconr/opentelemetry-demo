@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useCallback, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNumberFlagValue } from '@openfeature/react-sdk';
+import { trace } from '@opentelemetry/api';
 import Ad from '../../../components/Ad';
 import Layout from '../../../components/Layout';
 import ProductPrice from '../../../components/ProductPrice';
@@ -31,6 +33,7 @@ const ProductDetail: NextPage = () => {
   } = useCart();
   const { selectedCurrency } = useCurrency();
   const productId = query.productId as string;
+  const webInteractionSlowdown = useNumberFlagValue('webInteractionSlowdown', 0);
 
   useEffect(() => {
     setQuantity(1);
@@ -52,12 +55,28 @@ const ProductDetail: NextPage = () => {
   ) as { data: Product };
 
   const onAddItem = useCallback(async () => {
+    if (webInteractionSlowdown > 0) {
+      const span = trace.getTracer('frontend-web').startSpan('web_interaction_slowdown', {
+        attributes: { 'demo.feature_flag.web_interaction_slowdown': webInteractionSlowdown },
+      });
+      const deadline = performance.now() + webInteractionSlowdown;
+      while (performance.now() < deadline) {
+        const items = Array.from({ length: 2000 }, (_, i) => ({
+          id: i,
+          name: `product-${(i * 7919) % 2000}`,
+          price: Math.sin(i) * 100,
+        }));
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        JSON.stringify(items);
+      }
+      span.end();
+    }
     await addItem({
       productId,
       quantity,
     });
     push('/cart');
-  }, [addItem, productId, quantity, push]);
+  }, [addItem, productId, quantity, push, webInteractionSlowdown]);
 
   return (
     <AdProvider

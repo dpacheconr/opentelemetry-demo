@@ -196,6 +196,17 @@
         "off": false,
         "on": true
       }
+    },
+    "webInteractionSlowdown": {
+      "defaultVariant": "off",
+      "description": "block the main thread when adding an item to the cart, degrading Interaction to Next Paint",
+      "state": "ENABLED",
+      "variants": {
+        "1000ms": 1000,
+        "250ms": 250,
+        "500ms": 500,
+        "off": 0
+      }
     }
   }
 }

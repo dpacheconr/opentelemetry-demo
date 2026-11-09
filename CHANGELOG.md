@@ -7,6 +7,8 @@ the release.
 
 ## Unreleased
 
+* [flagd] [frontend] Add `webInteractionSlowdown` feature flag that blocks the
+  main thread on "Add To Cart" to degrade Interaction to Next Paint (INP)
 * [react-native-app] Catch errors from `placeOrder` in the Cart screen and
   show an error toast so payment failures are visible to the user instead of
   being silently dropped

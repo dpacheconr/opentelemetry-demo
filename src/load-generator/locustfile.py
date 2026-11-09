@@ -297,6 +297,8 @@ if browser_traffic_enabled:
                     await page.click('button:has-text("Add To Cart")')
                     await page.wait_for_load_state("domcontentloaded")
                     await page.wait_for_timeout(2000)  # giving the browser time to export the traces
+                    await page.goto("about:blank")
+                    await page.wait_for_timeout(1500)
                     logging.info("Product added to cart successfully")
                 except Exception as e:
                     logging.error(f"Error in add to cart task: {str(e)}")
