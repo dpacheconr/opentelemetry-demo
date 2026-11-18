@@ -69,3 +69,25 @@ var ProductCatalogLockContention = struct {
 		return client.BooleanValueDetails(ctx, "productCatalogLockContention", false, evalCtx)
 	},
 }
+
+// ProductCatalogNoisyTelemetry returns the value of the "productCatalogNoisyTelemetry" feature flag.
+// number of extra spans and logs emitted per GetProduct request to simulate a noisy service
+//
+// The flag is a type of integer and defaults to 0.
+var ProductCatalogNoisyTelemetry = struct {
+	fmt.Stringer
+	// Value returns the value of the [ProductCatalogNoisyTelemetry] flag.
+	Value evaluationValue[int64]
+
+	// ValueWithDetails returns the evaluation details of the [ProductCatalogNoisyTelemetry] flag
+	// and the evaluation error, if any.
+	ValueWithDetails evaluationDetails[int64]
+}{
+	Stringer: stringer("productCatalogNoisyTelemetry"),
+	Value: func(ctx context.Context, evalCtx openfeature.EvaluationContext) int64 {
+		return client.Int(ctx, "productCatalogNoisyTelemetry", 0, evalCtx)
+	},
+	ValueWithDetails: func(ctx context.Context, evalCtx openfeature.EvaluationContext) (openfeature.GenericEvaluationDetails[int64], error) {
+		return client.IntValueDetails(ctx, "productCatalogNoisyTelemetry", 0, evalCtx)
+	},
+}

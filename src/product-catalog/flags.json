@@ -10,6 +10,11 @@
       "defaultValue": false,
       "description": "simulates lock contention on the product catalog database",
       "flagType": "boolean"
+    },
+    "productCatalogNoisyTelemetry": {
+      "defaultValue": 0,
+      "description": "number of extra spans and logs emitted per GetProduct request to simulate a noisy service",
+      "flagType": "integer"
     }
   }
 }

@@ -64,6 +64,20 @@ go generate ./...
 This uses the [OpenFeature CLI](https://github.com/open-feature/cli) to
 produce `flags/flags_gen.go`.
 
+## Noisy telemetry scenario
+
+The `productCatalogNoisyTelemetry` feature flag makes `GetProduct` emit extra
+`product.lookup` spans and "Product lookup" log records on every request. Use
+it to overload the OpenTelemetry Collector.
+
+The flag is an integer and defaults to 0 (`off`). The variants `x100`, `x1000`,
+`x2000`, `x3000` and `x10000` set how many extra spans and log records each
+request emits. Change the variant in the feature flag UI.
+
+Total volume is the multiplier times the `GetProduct` request rate, so the
+load-generator user count (`LOCUST_USERS`) scales it too. High multipliers slow
+the service and can starve the rest of the demo of resources.
+
 ## Bump dependencies
 
 To bump all dependencies run:

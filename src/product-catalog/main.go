@@ -392,6 +392,14 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		attribute.String("demo.product.id", req.Id),
 	)
 
+	noisyLookups := flags.ProductCatalogNoisyTelemetry.Value(ctx, openfeature.EvaluationContext{})
+	tracer := otel.Tracer("product-catalog")
+	for i := int64(0); i < noisyLookups; i++ {
+		_, lookup := tracer.Start(ctx, "product.lookup")
+		logger.LogAttrs(ctx, slog.LevelInfo, "Product lookup", slog.Int64("iteration", i), slog.String("demo.product.id", req.Id))
+		lookup.End()
+	}
+
 	// GetProduct will fail on a specific product when feature flag is enabled
 	if p.checkProductFailure(ctx, req.Id) {
 		msg := "Error: Product Catalog Fail Feature Flag Enabled"
